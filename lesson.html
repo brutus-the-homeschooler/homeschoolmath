@@ -1,68 +1,100 @@
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Lesson</title>
+  <title>Math — Lesson</title>
   <link rel="stylesheet" href="assets/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
 </head>
 <body>
-  <a href="index.html">← Back</a>
-  <div id="wrap" class="card">Loading…</div>
+<header>
+  <h1 id="lesson-title">Loading Lesson…</h1>
+  <div id="auth"></div>
+</header>
+<main class="card">
+  <div id="lesson-content">Loading…</div>
+  <form id="quiz-form"></form>
+  <button id="submit" class="primary">Submit Quiz</button>
+  <div id="results"></div>
+</main>
+
 <script>
 (async () => {
-  const params = new URLSearchParams(location.search);
-  const lessonId = Number(params.get('lesson'));
+  const urlParams = new URLSearchParams(window.location.search);
+  const lessonId = urlParams.get('lesson');
   const ctx = await sb.currentUserWithProfile();
-  if (!ctx) { location.href = 'index.html'; return; }
+  if (!ctx) {
+    document.getElementById('lesson-content').textContent = "You must be signed in.";
+    return;
+  }
 
-  const { data: lesson } = await sb.supabase.from('lessons').select('*').eq('id', lessonId).single();
-  const md = await api.fetchSignedText(lesson.md_path);
-  const quiz = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
+  // fetch lesson info
+  const lesson = await api.getLesson(lessonId);
+  document.getElementById("lesson-title").textContent = lesson.title;
 
-  const attempt = await api.startAttempt(lessonId);
+  // fetch markdown + quiz JSON from storage
+  const lessonText = await api.getFileText(lesson.md_path);
+  const quizJson = JSON.parse(await api.getFileText(lesson.quiz_path));
 
-  const wrap = document.getElementById('wrap');
-  wrap.innerHTML = `
-    <h2>${lesson.title} <span class="badge">${lesson.for_user}</span></h2>
-    <article class="card" id="lesson-md"></article>
-    <form id="quiz" class="card">
-      <h3>${quiz.title}</h3>
-      ${quiz.questions.map(q => `
+  // render lesson
+  document.getElementById("lesson-content").innerHTML = marked.parse(lessonText);
+
+  // render quiz
+  const quizForm = document.getElementById("quiz-form");
+  quizForm.innerHTML = quizJson.questions.map((q, idx) => {
+    if (q.type === "mcq") {
+      return `
         <fieldset>
-          <legend>${q.prompt}</legend>
-          ${q.choices.map((c,i) => `
-            <label class="choice"><input type="radio" name="${q.id}" value="${i}"> ${c}</label>
+          <legend>${idx+1}. ${q.prompt}</legend>
+          ${q.choices.map((choice, i) => `
+            <label>
+              <input type="radio" name="${q.id}" value="${i}">
+              ${choice}
+            </label><br>
           `).join('')}
         </fieldset>
-      `).join('')}
-      <button type="submit" class="primary">Submit</button>
-    </form>
-    <div id="result" class="card"></div>
-  `;
-  document.getElementById('lesson-md').innerHTML = marked.parse(md);
+      `;
+    } else if (q.type === "input") {
+      return `
+        <fieldset>
+          <legend>${idx+1}. ${q.prompt}</legend>
+          <input type="text" name="${q.id}" placeholder="Type your answer">
+        </fieldset>
+      `;
+    }
+  }).join("");
 
-  document.getElementById('quiz').onsubmit = async (e) => {
+  // handle submission
+  document.getElementById("submit").onclick = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const answers = {};
-    quiz.questions.forEach(q => answers[q.id] = fd.get(q.id));
-    let correct = 0, detail = [];
-    quiz.questions.forEach(q => {
-      const idx = Number(answers[q.id]);
-      const ok = idx === q.answerIndex;
-      if (ok) correct++;
-      detail.push({ id: q.id, chosen: idx, ok, explain: q.explain });
-    });
-    const score = Math.round(100 * correct / quiz.questions.length);
-    await api.submitAttempt(attempt.id, score, detail);
+    let score = 0;
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.innerHTML = "";
 
-    document.getElementById('result').innerHTML = `<strong>Submitted.</strong> Score: ${score}`;
+    quizJson.questions.forEach((q, idx) => {
+      let correct = false;
+      if (q.type === "mcq") {
+        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+        if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
+      } else if (q.type === "input") {
+        const entered = document.querySelector(`input[name="${q.id}"]`).value.trim();
+        if (entered.toLowerCase() === q.correctAnswer.toLowerCase()) correct = true;
+      }
+
+      if (correct) score += 1;
+      resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
+        ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
+        <em>${q.explain}</em></p>`;
+    });
+
+    const percent = Math.round((score / quizJson.questions.length) * 100);
+    resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
+
+    // record attempt in Supabase
+    await api.recordAttempt(lesson.id, ctx.user.id, percent);
   };
 })();
 </script>
