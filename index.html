@@ -51,7 +51,7 @@
       return `<li>
         <strong>${l.title}</strong> <span class="badge">${l.for_user}</span>
         ${best ? ` — Best: ${best}` : ''}
-        — <a class="button" href="lesson.html?lesson=${l.id}">Open</a>
+        — <a class="button" href="lesson.html?slug=${l.slug}">Open</a>
       </li>`;
     }).join('')
   }</ul>`;
