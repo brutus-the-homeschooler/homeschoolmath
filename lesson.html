@@ -1,0 +1,70 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lesson</title>
+  <link rel="stylesheet" href="assets/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/api.js"></script>
+</head>
+<body>
+  <a href="index.html">← Back</a>
+  <div id="wrap" class="card">Loading…</div>
+<script>
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const lessonId = Number(params.get('lesson'));
+  const ctx = await sb.currentUserWithProfile();
+  if (!ctx) { location.href = 'index.html'; return; }
+
+  const { data: lesson } = await sb.supabase.from('lessons').select('*').eq('id', lessonId).single();
+  const md = await api.fetchSignedText(lesson.md_path);
+  const quiz = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
+
+  const attempt = await api.startAttempt(lessonId);
+
+  const wrap = document.getElementById('wrap');
+  wrap.innerHTML = `
+    <h2>${lesson.title} <span class="badge">${lesson.for_user}</span></h2>
+    <article class="card" id="lesson-md"></article>
+    <form id="quiz" class="card">
+      <h3>${quiz.title}</h3>
+      ${quiz.questions.map(q => `
+        <fieldset>
+          <legend>${q.prompt}</legend>
+          ${q.choices.map((c,i) => `
+            <label class="choice"><input type="radio" name="${q.id}" value="${i}"> ${c}</label>
+          `).join('')}
+        </fieldset>
+      `).join('')}
+      <button type="submit" class="primary">Submit</button>
+    </form>
+    <div id="result" class="card"></div>
+  `;
+  document.getElementById('lesson-md').innerHTML = marked.parse(md);
+
+  document.getElementById('quiz').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const answers = {};
+    quiz.questions.forEach(q => answers[q.id] = fd.get(q.id));
+    let correct = 0, detail = [];
+    quiz.questions.forEach(q => {
+      const idx = Number(answers[q.id]);
+      const ok = idx === q.answerIndex;
+      if (ok) correct++;
+      detail.push({ id: q.id, chosen: idx, ok, explain: q.explain });
+    });
+    const score = Math.round(100 * correct / quiz.questions.length);
+    await api.submitAttempt(attempt.id, score, detail);
+
+    document.getElementById('result').innerHTML = `<strong>Submitted.</strong> Score: ${score}`;
+  };
+})();
+</script>
+</body>
+</html>

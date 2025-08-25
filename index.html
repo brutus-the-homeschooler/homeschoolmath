@@ -1,0 +1,61 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Math — Dashboard</title>
+  <link rel="stylesheet" href="assets/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/api.js"></script>
+</head>
+<body>
+<header>
+  <h1>Math — This Week</h1>
+  <div id="auth"></div>
+</header>
+<main id="content" class="card">Loading…</main>
+<p class="muted">Parent? Visit <a href="parent.html">Parent dashboard</a>.</p>
+<script>
+(async () => {
+  const authEl = document.getElementById('auth');
+  const content = document.getElementById('content');
+  const ctx = await sb.currentUserWithProfile();
+
+  if (!ctx) {
+    authEl.innerHTML = `<input id="email" type="email" placeholder="Email"><button class="primary" id="login">Send magic link</button>`;
+    document.getElementById('login').onclick = async () => {
+      const email = document.getElementById('email').value;
+      if(!email) return alert('Enter email.');
+      await api.signIn(email);
+      alert('Check your email for the magic link.');
+    };
+    content.textContent = 'Sign in to view assignments.';
+    return;
+  } else {
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span> <button id="logout">Sign out</button>`;
+    document.getElementById('logout').onclick = api.signOut;
+  }
+
+  const week = await api.getActiveWeek();
+  if (!week) { content.textContent = 'No active week.'; return; }
+
+  const lessons = await api.listLessonsForCurrentUser(week.id);
+  const attempts = await api.listAttemptsForLessons(lessons.map(l => l.id));
+
+  content.innerHTML = `<h2>${week.label}</h2><ul>${
+    lessons.map(l => {
+      const my = attempts.filter(a => a.lesson_id === l.id && a.user_id === ctx.user.id);
+      const best = my.reduce((m,a) => Math.max(m, a.score ?? 0), 0);
+      return `<li>
+        <strong>${l.title}</strong> <span class="badge">${l.for_user}</span>
+        ${best ? ` — Best: ${best}` : ''}
+        — <a class="button" href="lesson.html?lesson=${l.id}">Open</a>
+      </li>`;
+    }).join('')
+  }</ul>`;
+})();
+</script>
+</body>
+</html>

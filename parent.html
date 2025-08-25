@@ -1,0 +1,103 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Parent Dashboard</title>
+  <link rel="stylesheet" href="assets/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/api.js"></script>
+</head>
+<body>
+<header>
+  <h1>Parent Dashboard</h1>
+  <div id="auth"></div>
+</header>
+
+<section class="card">
+  <h2>Grant a Retake</h2>
+  <div>
+    <label>Student: <select id="student"></select></label>
+    <label>Week: <select id="week"></select></label>
+    <label>Lesson: <select id="lesson"></select></label>
+    <button id="grant" class="primary">Grant Retake</button>
+  </div>
+  <p class="muted">Granting a retake allows one additional submission for the selected lesson for that student.</p>
+</section>
+
+<section class="card">
+  <h2>Attempts (Selected Week)</h2>
+  <table class="table" id="attemptsTable">
+    <thead><tr><th>When</th><th>Student</th><th>Lesson</th><th>Score</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<script>
+(async () => {
+  const authEl = document.getElementById('auth');
+  const ctx = await sb.currentUserWithProfile();
+  if (!ctx) {
+    authEl.innerHTML = `<input id="email" type="email" placeholder="Email"><button class="primary" id="login">Magic link</button>`;
+    document.getElementById('login').onclick = async () => {
+      const email = document.getElementById('email').value;
+      await api.signIn(email);
+      alert('Check your email.');
+    };
+    document.body.insertAdjacentHTML('beforeend','<p>Please sign in as parent.</p>');
+    return;
+  } else {
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span> <button id="logout">Sign out</button>`;
+    document.getElementById('logout').onclick = api.signOut;
+  }
+
+  // Basic role check (client-side convenience; RLS still protects server-side)
+  if (ctx.profile?.role !== 'parent') {
+    document.body.insertAdjacentHTML('beforeend','<p class="card">You must be a parent to view this page.</p>');
+    return;
+  }
+
+  const studentSel = document.getElementById('student');
+  const weekSel = document.getElementById('week');
+  const lessonSel = document.getElementById('lesson');
+  const students = await api.listStudents();
+  studentSel.innerHTML = students.map(s => `<option value="${s.user_id}">${s.display_name}</option>`).join('');
+
+  const weeks = await api.listWeeks();
+  weekSel.innerHTML = weeks.map(w => `<option value="${w.id}">${w.label}</option>`).join('');
+  async function refreshLessons(){
+    const lessons = await api.listAllLessons(Number(weekSel.value));
+    lessonSel.innerHTML = lessons.map(l => `<option value="${l.id}">${l.title} (${l.for_user})</option>`).join('');
+  }
+  weekSel.onchange = refreshLessons;
+  await refreshLessons();
+
+  document.getElementById('grant').onclick = async () => {
+    const kid = studentSel.value, lesson = Number(lessonSel.value);
+    try{
+      await api.grantRetake(kid, lesson);
+      alert('Retake granted.');
+    } catch(e){ alert(e.message); }
+    await loadAttempts();
+  };
+
+  async function loadAttempts(){
+    const weekId = Number(weekSel.value);
+    const rows = await api.listAttemptsForUser(null, weekId); // parent: all users
+    const tbody = document.querySelector('#attemptsTable tbody');
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '—'}</td>
+        <td>${r.lessons?.for_user ?? ''}</td>
+        <td>${r.lessons?.title ?? ''}</td>
+        <td>${r.score ?? ''}</td>
+      </tr>`).join('');
+  }
+  weekSel.onchange = loadAttempts;
+  await loadAttempts();
+})();
+</script>
+</body>
+</html>
