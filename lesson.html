@@ -36,8 +36,9 @@
   document.getElementById("lesson-title").textContent = lesson.title;
 
   // fetch markdown + quiz JSON from storage
-  const lessonText = await api.getFileText(lesson.md_path);
-  const quizJson = JSON.parse(await api.getFileText(lesson.quiz_path));
+  const lessonText = await api.fetchSignedText(lesson.md_path);
+  const quizJson = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
+
 
   // render lesson
   document.getElementById("lesson-content").innerHTML = marked.parse(lessonText);
