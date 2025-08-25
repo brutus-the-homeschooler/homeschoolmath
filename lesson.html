@@ -26,11 +26,14 @@
 <script>
 (async () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const lessonId = urlParams.get('lesson');
-  const ctx = await sb.currentUserWithProfile();
-  if (!ctx) {
-    document.getElementById('lesson-content').textContent = "You must be signed in.";
+  const slug = urlParams.get('slug');
+
+  const lesson = await api.getLessonBySlug(slug);
+  if (!lesson) {
+    document.getElementById("lesson-content").textContent = "Lesson not found.";
     return;
+}
+
   }
 
   // fetch lesson info
