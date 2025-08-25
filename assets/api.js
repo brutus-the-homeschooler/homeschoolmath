@@ -1,8 +1,11 @@
 
-async function signIn(email){
-  return sb.supabase.auth.signInWithOtp({ 
-    email, 
-    options: { emailRedirectTo: window.location.href } 
+async function signIn(email) {
+  return sb.supabase.auth.signInWithOtp({
+    email,
+    options: {
+      // Always redirect back to the live GitHub Pages site, not localhost
+      emailRedirectTo: window.location.origin + window.location.pathname
+    }
   });
 }
 async function signOut(){ await sb.supabase.auth.signOut(); location.reload(); }
