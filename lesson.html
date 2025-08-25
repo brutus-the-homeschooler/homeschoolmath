@@ -78,11 +78,11 @@
   }).join("");
 
   // handle submission
-document.getElementById("submit").onclick = async (e) => {
-  e.preventDefault();
-  let score = 0;
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
+  document.getElementById("submit").onclick = async (e) => {
+    e.preventDefault();
+    let score = 0;
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.innerHTML = "";
 
   quizJson.questions.forEach((q, idx) => {
     let correct = false;
