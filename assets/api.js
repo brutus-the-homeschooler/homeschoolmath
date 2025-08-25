@@ -87,6 +87,20 @@ async function getLesson(lessonId) {
   }
   return data;
 }
+async function getLessonBySlug(slug) {
+  const { data, error } = await sb.supabase
+    .from('lessons')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching lesson by slug:", error.message);
+    return null;
+  }
+  return data;
+}
+
 
 async function useOneRetake(userId, lessonId){
   const { data, error } = await sb.supabase
@@ -136,5 +150,6 @@ window.api = {
   useOneRetake, 
   grantRetake, 
   getLesson,
+  getLessonBySlug,
   recordAttempt   
 };
