@@ -28,17 +28,21 @@
   const urlParams = new URLSearchParams(window.location.search);
   const slug = urlParams.get('slug');
 
+  // get current user + profile
+  const ctx = await sb.currentUserWithProfile();
+  if (!ctx) {
+    document.getElementById("lesson-content").textContent = "You must be signed in.";
+    return;
+  }
+
+  // fetch lesson by slug
   const lesson = await api.getLessonBySlug(slug);
   if (!lesson) {
     document.getElementById("lesson-content").textContent = "Lesson not found.";
     return;
-}
-
   }
-
-  // fetch lesson info
-  const lesson = await api.getLesson(lessonId);
   document.getElementById("lesson-title").textContent = lesson.title;
+  
 
   // fetch markdown + quiz JSON from storage
   const lessonText = await api.fetchSignedText(lesson.md_path);
