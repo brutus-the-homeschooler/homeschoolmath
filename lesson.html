@@ -74,34 +74,49 @@
   }).join("");
 
   // handle submission
-  document.getElementById("submit").onclick = async (e) => {
-    e.preventDefault();
-    let score = 0;
-    const resultsDiv = document.getElementById("results");
-    resultsDiv.innerHTML = "";
+document.getElementById("submit").onclick = async (e) => {
+  e.preventDefault();
+  let score = 0;
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "";
 
-    quizJson.questions.forEach((q, idx) => {
-      let correct = false;
-      if (q.type === "mcq") {
-        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
-        if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
-      } else if (q.type === "input") {
-        const entered = document.querySelector(`input[name="${q.id}"]`).value.trim();
-        if (entered.toLowerCase() === q.correctAnswer.toLowerCase()) correct = true;
-      }
+  quizJson.questions.forEach((q, idx) => {
+    let correct = false;
+    if (q.type === "mcq") {
+      const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+      if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
+    } else if (q.type === "input") {
+      const entered = document.querySelector(`input[name="${q.id}"]`).value.trim();
+      if (entered.toLowerCase() === q.correctAnswer.toLowerCase()) correct = true;
+    }
 
-      if (correct) score += 1;
-      resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
-        ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
-        <em>${q.explain}</em></p>`;
-    });
+    if (correct) score += 1;
+    resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
+      ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
+      <em>${q.explain}</em></p>`;
+  });
 
-    const percent = Math.round((score / quizJson.questions.length) * 100);
-    resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
+  const percent = Math.round((score / quizJson.questions.length) * 100);
+  resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
 
-    // record attempt in Supabase
-    await api.recordAttempt(lesson.id, ctx.user.id, percent);
+  // record attempt in Supabase
+  await api.recordAttempt(lesson.id, ctx.user.id, percent);
+
+  // 🔹 hide Submit button
+  document.getElementById("submit").style.display = "none";
+
+  // 🔹 show retake message
+  resultsDiv.innerHTML += `
+    <div id="retake-box" style="margin-top:1em;">
+      <button id="retake-btn" class="secondary">Send retake message</button>
+    </div>
+  `;
+
+  document.getElementById("retake-btn").onclick = () => {
+    alert("Retake request sent! (parent dashboard will handle approval)");
   };
+};
+
 })();
 </script>
 </body>
