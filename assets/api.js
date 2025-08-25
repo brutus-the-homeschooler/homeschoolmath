@@ -86,6 +86,40 @@ async function grantRetake(kidUserId, lessonId){
   const { error } = await sb.supabase.from('retake_grants').insert({ user_id: kidUserId, lesson_id: lessonId });
   if(error) throw error;
 }
-window.api = { signIn, signOut, getActiveWeek, listWeeks, listLessonsForCurrentUser, listAllLessons, 
-  listStudents, listAttemptsForLessons, listAttemptsForUser, fetchSignedText, startAttempt, submitAttempt, 
-  getRetakeStatus, useOneRetake, grantRetake };
+async function recordAttempt(lessonId, userId, score) {
+  const { data, error } = await sb.supabase
+    .from("attempts")
+    .insert([
+      {
+        lesson_id: lessonId,
+        user_id: userId,
+        score: score,
+        submitted_at: new Date().toISOString()
+      }
+    ]);
+
+  if (error) {
+    console.error("Error recording attempt:", error.message);
+    alert("Could not save your score. Please try again.");
+  }
+  return data;
+}
+
+window.api = { 
+  signIn, 
+  signOut, 
+  getActiveWeek, 
+  listWeeks, 
+  listLessonsForCurrentUser, 
+  listAllLessons, 
+  listStudents, 
+  listAttemptsForLessons, 
+  listAttemptsForUser, 
+  fetchSignedText, 
+  startAttempt, 
+  submitAttempt, 
+  getRetakeStatus, 
+  useOneRetake, 
+  grantRetake, 
+  recordAttempt   
+};
