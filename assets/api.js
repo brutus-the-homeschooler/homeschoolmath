@@ -74,6 +74,20 @@ async function getRetakeStatus(userId, lessonId){
   ]);
   return { canRetake: (attempts?.length ?? 0) > 0 && (grants?.length ?? 0) > 0 };
 }
+async function getLesson(lessonId) {
+  const { data, error } = await sb.supabase
+    .from('lessons')
+    .select('*')
+    .eq('id', lessonId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching lesson:", error.message);
+    return null;
+  }
+  return data;
+}
+
 async function useOneRetake(userId, lessonId){
   const { data, error } = await sb.supabase
     .from('retake_grants').select('*')
@@ -121,5 +135,6 @@ window.api = {
   getRetakeStatus, 
   useOneRetake, 
   grantRetake, 
+  getLesson,
   recordAttempt   
 };
