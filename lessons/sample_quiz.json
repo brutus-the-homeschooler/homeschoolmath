@@ -1,0 +1,120 @@
+{
+  "title": "Placeholder Quiz — Sample Questions",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "mcq",
+      "prompt": "What is 2 + 2?",
+      "choices": ["3", "4", "5", "22"],
+      "answerIndex": 1,
+      "explain": "2 plus 2 equals 4."
+    },
+    {
+      "id": "q2",
+      "type": "mcq",
+      "prompt": "Which of these is a prime number?",
+      "choices": ["9", "12", "13", "15"],
+      "answerIndex": 2,
+      "explain": "13 is prime."
+    },
+    {
+      "id": "q3",
+      "type": "mcq",
+      "prompt": "The area of a rectangle with length 5 and width 3 is:",
+      "choices": ["8", "15", "30", "20"],
+      "answerIndex": 1,
+      "explain": "Area = length × width = 15."
+    },
+    {
+      "id": "q4",
+      "type": "mcq",
+      "prompt": "Simplify: 5/10",
+      "choices": ["1/5", "1/2", "2/5", "5/2"],
+      "answerIndex": 1,
+      "explain": "5/10 reduces to 1/2."
+    },
+    {
+      "id": "q5",
+      "type": "mcq",
+      "prompt": "Which fraction is equivalent to 2/3?",
+      "choices": ["4/6", "6/8", "8/10", "10/16"],
+      "answerIndex": 0,
+      "explain": "Multiply top and bottom by 2."
+    },
+    {
+      "id": "q6",
+      "type": "mcq",
+      "prompt": "Solve: 6 × 7",
+      "choices": ["36", "42", "56", "67"],
+      "answerIndex": 1,
+      "explain": "6 × 7 = 42."
+    },
+    {
+      "id": "q7",
+      "type": "mcq",
+      "prompt": "The square root of 49 is:",
+      "choices": ["6", "7", "8", "14"],
+      "answerIndex": 1,
+      "explain": "7 × 7 = 49."
+    },
+    {
+      "id": "q8",
+      "type": "mcq",
+      "prompt": "Convert 0.25 to a fraction.",
+      "choices": ["1/2", "1/4", "2/5", "3/4"],
+      "answerIndex": 1,
+      "explain": "0.25 = 25/100 = 1/4."
+    },
+    {
+      "id": "q9",
+      "type": "mcq",
+      "prompt": "Which shape has exactly 3 sides?",
+      "choices": ["Square", "Triangle", "Pentagon", "Hexagon"],
+      "answerIndex": 1,
+      "explain": "A triangle has 3 sides."
+    },
+    {
+      "id": "q10",
+      "type": "mcq",
+      "prompt": "Which number is an even integer?",
+      "choices": ["5", "9", "12", "21"],
+      "answerIndex": 2,
+      "explain": "12 is even."
+    },
+    {
+      "id": "q11",
+      "type": "input",
+      "prompt": "Enter the value of 8 × 8.",
+      "correctAnswer": "64",
+      "explain": "8 times 8 = 64."
+    },
+    {
+      "id": "q12",
+      "type": "input",
+      "prompt": "What is the perimeter of a square with side length 4?",
+      "correctAnswer": "16",
+      "explain": "Perimeter = 4 × side."
+    },
+    {
+      "id": "q13",
+      "type": "input",
+      "prompt": "Solve for x: 5 + x = 12",
+      "correctAnswer": "7",
+      "explain": "Subtract 5 from both sides."
+    },
+    {
+      "id": "q14",
+      "type": "input",
+      "prompt": "Write the fraction one-half as a decimal.",
+      "correctAnswer": "0.5",
+      "explain": "1 ÷ 2 = 0.5"
+    },
+    {
+      "id": "q15",
+      "type": "input",
+      "prompt": "What is the area of a square with side length 9?",
+      "correctAnswer": "81",
+      "explain": "Area = side × side = 81."
+    }
+  ]
+}
