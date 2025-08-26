@@ -24,13 +24,20 @@
   const ctx = await sb.currentUserWithProfile();
 
   if (!ctx) {
-    authEl.innerHTML = `<input id="email" type="email" placeholder="Email"><button class="primary" id="login">Send magic link</button>`;
+    authEl.innerHTML = `
+      <input id="email" type="text" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <button class="primary" id="login">Login</button>
+    `;
+
     document.getElementById('login').onclick = async () => {
       const email = document.getElementById('email').value;
-      if(!email) return alert('Enter email.');
-      await api.signIn(email);
-      alert('Check your email for the magic link.');
-    };
+      const password = document.getElementById('password').value;
+      if (!email || !password) return alert("Enter both email and password");
+      const user = await api.signInWithPassword(email, password);
+      if (user) location.reload();
+};
+
     content.textContent = 'Sign in to view assignments.';
     return;
   } else {
