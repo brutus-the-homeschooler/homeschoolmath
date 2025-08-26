@@ -132,9 +132,20 @@ async function recordAttempt(lessonId, userId, score) {
   }
   return data;
 }
+async function signInWithPassword(email, password) {
+  const { data, error } = await sb.supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+  if (error) {
+    alert("Login failed: " + error.message);
+    return null;
+  }
+  return data;
+}
 
 window.api = { 
-  signIn, 
+  signIn, signInWithPassword, 
   signOut, 
   getActiveWeek, 
   listWeeks, 
