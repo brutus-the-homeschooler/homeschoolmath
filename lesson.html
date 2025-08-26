@@ -64,10 +64,13 @@
   // render quiz
   const quizForm = document.getElementById("quiz-form");
   quizForm.innerHTML = quizJson.questions.map((q, idx) => {
+    let imageHtml = q.image ? `<div><img src="${q.image}" alt="Question image" style="max-width:200px; margin:8px 0;"></div>` : "";
+  
     if (q.type === "mcq") {
       return `
         <fieldset>
           <legend>${idx+1}. ${q.prompt}</legend>
+          ${imageHtml}
           ${q.choices.map((choice, i) => `
             <label>
               <input type="radio" name="${q.id}" value="${i}">
@@ -80,11 +83,13 @@
       return `
         <fieldset>
           <legend>${idx+1}. ${q.prompt}</legend>
+          ${imageHtml}
           <input type="text" name="${q.id}" placeholder="Type your answer">
         </fieldset>
       `;
     }
   }).join("");
+
 
   // handle submission
   document.getElementById("submit").onclick = async (e) => {
