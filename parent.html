@@ -40,24 +40,32 @@
   const authEl = document.getElementById('auth');
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
-    authEl.innerHTML = `<input id="email" type="email" placeholder="Email"><button class="primary" id="login">Magic link</button>`;
-    document.getElementById('login').onclick = async () => {
-      const email = document.getElementById('email').value;
-      await api.signIn(email);
-      alert('Check your email.');
-    };
-    document.body.insertAdjacentHTML('beforeend','<p>Please sign in as parent.</p>');
-    return;
-  } else {
-    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span> <button id="logout">Sign out</button>`;
-    document.getElementById('logout').onclick = api.signOut;
-  }
+    authEl.innerHTML = `
+      <input id="email" type="text" placeholder="Email" autocapitalize="none" autocomplete="username">
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="primary" id="login">Login</button>
+    `;
 
-  // Basic role check (client-side convenience; RLS still protects server-side)
-  if (ctx.profile?.role !== 'parent') {
-    document.body.insertAdjacentHTML('beforeend','<p class="card">You must be a parent to view this page.</p>');
+    const doLogin = async () => {
+      const btn = document.getElementById('login');
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) { alert("Enter both email and password"); return; }
+      btn.disabled = true;
+      const user = await api.signInWithPassword(email, password);
+      if (user) location.reload();
+      btn.disabled = false;
+    };
+
+    document.getElementById('login').onclick = doLogin;
+    document.getElementById('password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    content.textContent = 'Sign in to view assignments.';
     return;
-  }
+}
+
 
   const studentSel = document.getElementById('student');
   const weekSel = document.getElementById('week');
