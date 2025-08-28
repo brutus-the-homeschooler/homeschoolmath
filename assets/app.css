@@ -1,15 +1,151 @@
+/* Base Layout */
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  line-height: 1.55;
+  background: #fafafa;
+  color: #111827;
+}
 
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.55}
-header{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem}
-.card{border:1px solid #e5e7eb;border-radius:14px;padding:1rem;margin:1rem 0;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-button{padding:.6rem 1rem;border:0;border-radius:10px;cursor:pointer}
-button.primary{background:#111827;color:#fff}
-input,select{padding:.5rem .6rem;border:1px solid #d1d5db;border-radius:8px}
-fieldset{border:0;margin:.5rem 0;padding:0}
-legend{font-weight:600;margin:.25rem 0}
-label.choice{display:block;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:10px;margin:.4rem 0;cursor:pointer}
-.badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;background:#eef2ff}
-.table{width:100%;border-collapse:collapse}
-.table th,.table td{border-bottom:1px solid #eee;padding:.5rem;text-align:left}
-.muted{color:#6b7280}
-a.button{display:inline-block;text-decoration:none}
+/* Sticky Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: .8rem 0;
+  border-bottom: 1px solid #eee;
+  z-index: 10;
+}
+
+/* Card Containers */
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1rem;
+  margin: 1rem 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  background: #fff;
+}
+
+/* Buttons */
+button,
+a.button {
+  padding: .6rem 1rem;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+  transition: all 0.15s ease-in-out;
+}
+
+button.primary,
+a.button.primary {
+  background: #111827;
+  color: #fff;
+}
+
+button.secondary,
+a.button.secondary {
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
+button:hover,
+a.button:hover {
+  opacity: 0.9;
+}
+
+/* Forms */
+input,
+select {
+  padding: .5rem .6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 300px;
+}
+
+/* Quiz Fields */
+fieldset {
+  border: 0;
+  margin: .5rem 0;
+  padding: 0;
+}
+legend {
+  font-weight: 600;
+  margin: .25rem 0;
+}
+label.choice {
+  display: block;
+  padding: .5rem .75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  margin: .4rem 0;
+  cursor: pointer;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  font-size: .85em;
+}
+
+/* Lesson Lists */
+ul {
+  list-style: none;
+  padding: 0;
+}
+ul li {
+  margin: .6rem 0;
+  padding: .6rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+}
+
+/* Results */
+#results p {
+  margin: .5rem 0;
+  padding: .5rem;
+  border-radius: 8px;
+}
+#results p.correct {
+  background: #ecfdf5;
+  color: #065f46;
+}
+#results p.incorrect {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+/* Tables */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  border-bottom: 1px solid #eee;
+  padding: .5rem;
+  text-align: left;
+}
+
+/* Muted Text */
+.muted {
+  color: #6b7280;
+}
