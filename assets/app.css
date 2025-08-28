@@ -146,6 +146,65 @@ ul li div span[title="Completed"] {
   background: #fef2f2;
   color: #991b1b;
 }
+/* ========== Parent Controls ========== */
+.parent-controls {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  margin-block: 8px 14px;
+  display: grid;
+  gap: 10px;
+  background: #fff;
+}
+
+.parent-controls .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parent-controls .grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.parent-controls label {
+  font-size: 0.95rem;
+  display: block;
+}
+
+.parent-controls input[type="number"],
+.parent-controls input[type="text"],
+.parent-controls textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.parent-controls textarea { min-height: 70px; }
+
+.parent-controls .btns {
+  display: flex;
+  gap: 8px;
+}
+
+.parent-controls button {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  cursor: pointer;
+}
+
+.parent-controls button:hover { background: #f3f4f6; }
+
+.parent-controls .muted {
+  font-size: 0.85rem;
+  opacity: .75;
+}
 
 /* Tables */
 .table {
