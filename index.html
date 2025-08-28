@@ -65,9 +65,11 @@
       const my = attempts.filter(a => a.lesson_id === l.id && a.user_id === ctx.user.id);
       const best = my.reduce((m,a) => Math.max(m, a.score ?? 0), 0);
       return `<li>
-        <strong>${l.title}</strong> <span class="badge">${l.for_user}</span>
-        ${best ? ` — Best: ${best}` : ''}
-        — <a class="button" href="lesson.html?slug=${l.slug}">Open</a>
+        <strong>${l.title}</strong>
+        <div style="margin-left:auto; display:flex; align-items:center; gap:1rem;">
+          ${best ? `<span class="badge">${best}%</span>` : ``}
+          <a class="button" href="lesson.html?slug=${l.slug}">Open</a>
+        </div>
       </li>`;
     }).join('')
   }</ul>`;
