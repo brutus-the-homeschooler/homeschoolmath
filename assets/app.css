@@ -23,29 +23,17 @@ header {
   border-bottom: 1px solid #eee;
   z-index: 10;
 }
-.reflection {
-  margin: 1rem 0;
-  padding: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fafafa;
-}
-
-.reflection label {
+.markdown textarea {
   display: block;
-  font-weight: 600;
-  margin-bottom: .5rem;
-  line-height: 1.4;
-}
-
-.reflection textarea {
-  width: 100%;
+  width: 100% !important;
   min-height: 80px;
+  margin-top: .5rem;
   padding: .6rem;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   resize: vertical;
 }
+
 
 /* Card Containers */
 .card {
