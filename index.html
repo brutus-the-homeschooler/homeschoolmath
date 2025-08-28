@@ -60,19 +60,30 @@
   const lessons = await api.listLessonsForCurrentUser(week.id);
   const attempts = await api.listAttemptsForLessons(lessons.map(l => l.id));
 
+  const today = new Date();
+
   content.innerHTML = `<h2>${week.label}</h2><ul>${
     lessons.map(l => {
       const my = attempts.filter(a => a.lesson_id === l.id && a.user_id === ctx.user.id);
       const best = my.reduce((m,a) => Math.max(m, a.score ?? 0), 0);
+      const completed = my.some(a => a.submitted_at);
+
+    // only show if not expired
+      const expireDate = new Date(week.end_date);
+      expireDate.setDate(expireDate.getDate() + 7);
+      if (today > expireDate) return "";
+
       return `<li>
         <strong>${l.title}</strong>
         <div style="margin-left:auto; display:flex; align-items:center; gap:1rem;">
+          ${completed ? `<span title="Completed">✅</span>` : ``}
           ${best ? `<span class="badge">${best}%</span>` : ``}
           <a class="button" href="lesson.html?slug=${l.slug}">Open</a>
         </div>
       </li>`;
-    }).join('')
-  }</ul>`;
+  }).join('')
+}</ul>`;
+
 })();
 </script>
 </body>
