@@ -73,9 +73,7 @@
   const userId = ctx.user.id;
 
   // ----- Load lessons + attempts -----
-  // If you want students to only see their assignments, swap to:
-  //   const lessonsRaw = await api.listLessonsAssignedToCurrentUser();
-  const lessonsRaw = await api.listAllLessonsForSite();
+  const lessonsRaw = await api.listLessonsAssignedToCurrentUser();
   const attempts   = await api.listAttemptsForUserAll(userId);
 
   // Build completion + best score maps
@@ -90,39 +88,38 @@
     return m;
   }, new Map());
 
-  // ----- Filter to lessons whose files exist in Storage (fast list-based) -----
-  // We expect lesson.md_path and lesson.quiz_path to be storage paths like:
-  //   "lessons/lesson-69.md" and "quizzes/lesson-69.json" (folder can vary)
-  const BUCKET = 'content'; // adjust if your bucket name is different
+  // ----- Check that lesson files exist -----
+  const BUCKET = 'content'; // adjust if different
+  const userFolder = ctx.profile.display_name; // "Daniel" or "Norah"
 
-  // Group lessons by directory so we can list each folder once
-  const byDir = new Map(); // dirPath -> array of lessons touching that dir
-  for (const L of lessonsRaw) {
-    const mdDir = dirOf(L.md_path);
-    const qzDir = dirOf(L.quiz_path);
-    if (!byDir.has(mdDir)) byDir.set(mdDir, []);
-    if (!byDir.has(qzDir)) byDir.set(qzDir, []);
-    byDir.get(mdDir).push(L);
-    if (qzDir !== mdDir) byDir.get(qzDir).push(L);
+  async function listAllNamesInFolder(bucket, folder) {
+    const names = new Set();
+    const pageSize = 100;
+    let offset = 0;
+    while (true) {
+      const { data, error } = await sb.supabase
+        .storage.from(bucket)
+        .list(folder, { limit: pageSize, offset, sortBy: { column: 'name', order: 'asc' } });
+      if (error) break;
+      (data || []).forEach(entry => {
+        if (entry.name) names.add(entry.name);
+      });
+      if (!data || data.length < pageSize) break;
+      offset += pageSize;
+    }
+    return names;
   }
 
-  // List each directory and collect filenames into a Set for O(1) existence checks
-  const existingByDir = new Map(); // dir -> Set(filenames)
-  for (const dir of byDir.keys()) {
-    const names = await listAllNamesInFolder(BUCKET, dir);
-    existingByDir.set(dir, names);
-  }
+  const lessonFiles = await listAllNamesInFolder(BUCKET, `${userFolder}/lessons`);
+  const quizFiles   = await listAllNamesInFolder(BUCKET, `${userFolder}/quizzes`);
 
-  // Keep only lessons where both md + json exist
   const lessons = lessonsRaw.filter(L => {
-    const mdD = dirOf(L.md_path), mdN = nameOf(L.md_path);
-    const qD  = dirOf(L.quiz_path), qN = nameOf(L.quiz_path);
-    const mdOk = (existingByDir.get(mdD) || new Set()).has(mdN);
-    const qOk  = (existingByDir.get(qD)  || new Set()).has(qN);
-    return mdOk && qOk;
+    const mdName = L.md_path.split('/').pop();
+    const qzName = L.quiz_path.split('/').pop();
+    return lessonFiles.has(mdName) && quizFiles.has(qzName);
   });
 
-  // ----- Filter UI state -----
+  // ----- Filter UI -----
   filterEl.value = localStorage.getItem('lessonFilter') || 'pending';
 
   function applyFilter(mode) {
@@ -159,53 +156,13 @@
     }).join('');
   }
 
-  // initial render + wire change
+  // Initial render + listener
   render(filterEl.value);
   filterEl.addEventListener('change', () => {
     localStorage.setItem('lessonFilter', filterEl.value);
     render(filterEl.value);
   });
 
-  // ----- Helpers -----
-  function dirOf(path) {
-    const i = path.lastIndexOf('/');
-    return i === -1 ? '' : path.slice(0, i); // '' = root of bucket
-    // e.g., "lessons/grade6" -> "lessons/grade6"
-  }
-  function nameOf(path) {
-    const i = path.lastIndexOf('/');
-    return i === -1 ? path : path.slice(i + 1); // e.g., "lesson-69.md"
-  }
-
-  // List ALL filenames in a folder (handles pagination)
-  async function listAllNamesInFolder(bucket, folder) {
-    // Supabase Storage 'list' is not recursive; we list exactly this folder.
-    // If you have nested folders deeper than one level, make sure folder is the exact parent.
-    const names = new Set();
-    const pageSize = 100;
-    let offset = 0;
-    while (true) {
-      const { data, error } = await sb.supabase
-        .storage
-        .from(bucket)
-        .list(folder || '', { limit: pageSize, offset, sortBy: { column: 'name', order: 'asc' } });
-      if (error) {
-        console.warn('Storage list error for', folder, error.message);
-        break;
-      }
-      (data || []).forEach(entry => {
-        // We only care about files (not subfolders)
-        if (entry && !entry.id && entry.name) {
-          names.add(entry.name);
-        } else if (entry && entry.name && entry.metadata && entry.metadata.size >= 0) {
-          names.add(entry.name); // newer sdk uses metadata for files
-        }
-      });
-      if (!data || data.length < pageSize) break; // no more pages
-      offset += pageSize;
-    }
-    return names;
-  }
 })();
 </script>
 </body>
