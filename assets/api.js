@@ -10,12 +10,19 @@ async function signIn(email) {
 }
 async function signOut(){ await sb.supabase.auth.signOut(); location.reload(); }
 
+function todayLocalISO() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); // shift to local
+  return d.toISOString().slice(0,10);
+}
+
 async function getActiveWeek(){
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayLocalISO();   // use local date
   const { data } = await sb.supabase.from('weeks')
     .select('*').lte('start_date', today).gte('end_date', today).maybeSingle();
   return data;
 }
+
 async function listWeeks(limit=12){
   const { data } = await sb.supabase.from('weeks').select('*').order('start_date',{ascending:false}).limit(limit);
   return data||[];
