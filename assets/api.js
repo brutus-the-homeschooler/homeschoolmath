@@ -52,6 +52,21 @@ async function getLesson(lessonId) {
   }
   return data;
 }
+/**
+ * Check that both markdown and quiz JSON exist for a lesson.
+ * lesson.md_path and lesson.quiz_path should be storage paths like "lessons/lesson-01.md"
+ */
+async function checkLessonFilesExist(lesson) {
+  const bucket = "content"; // change if your bucket is named differently
+
+  // Try to create signed URLs for both files (if they don't exist, you'll get an error)
+  const [mdRes, quizRes] = await Promise.all([
+    sb.supabase.storage.from(bucket).createSignedUrl(lesson.md_path, 60),
+    sb.supabase.storage.from(bucket).createSignedUrl(lesson.quiz_path, 60)
+  ]);
+
+  return !(mdRes.error || quizRes.error);
+}
 
 /**
  * Get a lesson by slug
@@ -296,7 +311,7 @@ window.api = {
   listAllLessonsForSite,
   listLessonsAssignedToCurrentUser,
   listLessonsForCurrentUserMulti, // new multi-week compatible
-
+  checkLessonFilesExist,
   // Attempts / completion
   startAttempt,
   submitAttempt,
@@ -304,7 +319,7 @@ window.api = {
   listAttemptsForUserAll,     // for Completed vs Not completed
   listAttemptsForLessons,
   listAttemptsForUser,
-
+  
   // Retake
   getRetakeStatus,
   useOneRetake,
