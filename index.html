@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -11,16 +10,35 @@
   <script src="assets/api.js"></script>
 </head>
 <body>
-<header>
-  <h1>Math — This Week</h1>
+<header style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+  <h1>Math — Lessons</h1>
+
+  <div style="display:flex;align-items:center;gap:.5rem;">
+    <label for="lesson-filter">Show:</label>
+    <select id="lesson-filter">
+      <option value="all">All</option>
+      <option value="completed">Completed only</option>
+      <option value="pending">Not completed only</option>
+    </select>
+  </div>
+
   <div id="auth"></div>
 </header>
-<main id="content" class="card">Loading…</main>
+
+<main id="content" class="card">
+  <ul id="lessons">Loading…</ul>
+</main>
+
 <p class="muted">Parent? Visit <a href="parent.html">Parent dashboard</a>.</p>
+
 <script>
 (async () => {
-  const authEl = document.getElementById('auth');
-  const content = document.getElementById('content');
+  const authEl   = document.getElementById('auth');
+  const content  = document.getElementById('content');
+  const listEl   = document.getElementById('lessons');
+  const filterEl = document.getElementById('lesson-filter');
+
+  // ----- Auth -----
   const ctx = await sb.currentUserWithProfile();
 
   if (!ctx) {
@@ -46,44 +64,78 @@
       if (e.key === 'Enter') doLogin();
     });
 
-  content.textContent = 'Sign in to view assignments.';
-  return;
-
+    listEl.innerHTML = '<li>Sign in to view assignments.</li>';
+    return;
   } else {
     authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span> <button id="logout">Sign out</button>`;
     document.getElementById('logout').onclick = api.signOut;
   }
 
-  const week = await api.getActiveWeek();
-  if (!week) { content.textContent = 'No active week.'; return; }
+  const userId = ctx.user.id;
 
-  const lessons = await api.listLessonsForCurrentUser(week.id);
-  const attempts = await api.listAttemptsForLessons(lessons.map(l => l.id));
+  // ----- Load data -----
+  // If you want students to ONLY see their own assigned lessons, use:
+  //   const lessons = await api.listLessonsAssignedToCurrentUser();
+  // If you want everyone to see all lessons in the DB, use:
+  const lessons  = await api.listAllLessonsForSite();
 
-  const today = new Date();
+  const attempts = await api.listAttemptsForUserAll(userId);
 
-  content.innerHTML = `<h2>${week.label}</h2><ul>${
-    lessons.map(l => {
-      const my = attempts.filter(a => a.lesson_id === l.id && a.user_id === ctx.user.id);
-      const best = my.reduce((m,a) => Math.max(m, a.score ?? 0), 0);
-      const completed = my.some(a => a.submitted_at);
+  // completion + best score maps
+  const completedSet = new Set(
+    (attempts || []).filter(a => !!a.submitted_at).map(a => a.lesson_id)
+  );
 
-    // only show if not expired
-      const expireDate = new Date(week.end_date);
-      expireDate.setDate(expireDate.getDate() + 7);
-      if (today > expireDate) return "";
+  const bestScoreByLesson = (attempts || []).reduce((m, a) => {
+    const current = m.get(a.lesson_id) ?? 0;
+    const s = typeof a.score === 'number' ? a.score : 0;
+    if (s > current) m.set(a.lesson_id, s);
+    return m;
+  }, new Map());
 
-      return `<li>
-        <strong>${l.title}</strong>
-        <div style="margin-left:auto; display:flex; align-items:center; gap:1rem;">
-          ${completed ? `<span title="Completed">✅</span>` : ``}
-          ${best ? `<span class="badge">${best}%</span>` : ``}
-          <a class="button" href="lesson.html?slug=${l.slug}">Open</a>
-        </div>
-      </li>`;
-  }).join('')
-}</ul>`;
+  // ----- Filter state -----
+  filterEl.value = localStorage.getItem('lessonFilter') || 'pending';
 
+  function applyFilter(mode) {
+    if (mode === 'completed') return lessons.filter(L => completedSet.has(L.id));
+    if (mode === 'pending')   return lessons.filter(L => !completedSet.has(L.id));
+    return lessons.slice(); // all
+  }
+
+  function render(mode) {
+    const view = applyFilter(mode);
+
+    if (!view.length) {
+      listEl.innerHTML = '<li>No lessons found.</li>';
+      return;
+    }
+
+    listEl.innerHTML = view.map(L => {
+      const done = completedSet.has(L.id);
+      const best = bestScoreByLesson.get(L.id) ?? 0;
+
+      return `
+        <li style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.25rem 0;">
+          <span>
+            <a href="lesson.html?slug=${encodeURIComponent(L.slug)}">${L.title}</a>
+            <small class="muted"> — for ${L.for_user}</small>
+          </span>
+          <span style="display:flex;align-items:center;gap:.5rem;">
+            ${done ? `<span title="Completed">✅</span>` : ``}
+            ${best ? `<span class="badge">${best}%</span>` : ``}
+            <a class="button" href="lesson.html?slug=${encodeURIComponent(L.slug)}">Open</a>
+          </span>
+        </li>
+      `;
+    }).join('');
+  }
+
+  // initial render + wire changes
+  render(filterEl.value);
+  filterEl.addEventListener('change', () => {
+    localStorage.setItem('lessonFilter', filterEl.value);
+    render(filterEl.value);
+  });
 })();
 </script>
 </body>
