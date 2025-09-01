@@ -109,10 +109,15 @@
       if (q.type === "mcq") {
         const selected = document.querySelector(`input[name="${q.id}"]:checked`);
         if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
-      } else if (q.type === "input") {
-        const entered = document.querySelector(`input[name="${q.id}"]`).value.trim();
-        if (entered.toLowerCase() === q.correctAnswer.toLowerCase()) correct = true;
-      }
+      }  else if (q.type === "input") {
+        const el = document.querySelector(`input[name="${q.id}"]`);
+        const entered = el ? el.value.trim() : "";
+        if (entered && q.correctAnswer && entered.toLowerCase() === q.correctAnswer.toLowerCase()) {
+          correct = true;
+  }
+}
+
+
 
       if (correct) score += 1;
       resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
