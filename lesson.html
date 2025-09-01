@@ -41,11 +41,18 @@
   }
 
   // fetch lesson by slug
-  const lesson = await api.getLessonBySlug(slug);
-  if (!lesson) {
-    document.getElementById("lesson-content").textContent = "Lesson not found.";
-    return;
+ // Fetch all lessons from DB
+  const lessonsRaw = await api.listAllLessonsForSite();
+
+// Check existence of files
+  const lessons = [];
+  for (const L of lessonsRaw) {
+    const ok = await api.checkLessonFilesExist(L);
+    if (ok) lessons.push(L);
   }
+
+// Now lessons only contains those with valid .md and .json
+
   document.getElementById("lesson-title").textContent = lesson.title;
   
 
