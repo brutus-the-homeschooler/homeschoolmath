@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="en">
 <head>
-  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Math — Lesson</title>
@@ -16,15 +15,15 @@
 <header>
   <h1 id="lesson-title">Loading Lesson…</h1>
   <nav>
-  <a href="index.html" class="button secondary">⬅ Back to Lesson Page</a>
-</nav>
-
+    <a href="index.html" class="button secondary">⬅ Back to Lesson Page</a>
+  </nav>
   <div id="auth"></div>
 </header>
+
 <main class="card">
   <div id="lesson-content" data-lesson-id="">Loading…</div>
   <form id="quiz-form"></form>
-  <button id="submit" class="primary">Submit Quiz</button>
+  <button id="submit" class="primary" style="display:none;">Submit Quiz</button>
   <div id="results"></div>
 </main>
 
@@ -41,42 +40,36 @@
   }
 
   // fetch lesson by slug
- // Fetch all lessons from DB
-  const lessonsRaw = await api.listAllLessonsForSite();
-
-// Check existence of files
-  const lessons = [];
-  for (const L of lessonsRaw) {
-    const ok = await api.checkLessonFilesExist(L);
-    if (ok) lessons.push(L);
+  const lesson = await api.getLessonBySlug(slug);
+  if (!lesson) {
+    document.getElementById("lesson-content").textContent = "Lesson not found.";
+    return;
   }
 
-// Now lessons only contains those with valid .md and .json
-
-  document.getElementById("lesson-title").textContent = lesson.title;
-  
-
   // fetch markdown + quiz JSON from storage
-  const lessonText = await api.fetchSignedText(lesson.md_path);
-  const quizJson = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
+  let lessonText, quizJson;
+  try {
+    lessonText = await api.fetchSignedText(lesson.md_path);
+    quizJson   = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
+  } catch (err) {
+    document.getElementById("lesson-content").textContent = "Error loading lesson files.";
+    console.error(err);
+    return;
+  }
 
-
-  // render lesson
   // render lesson
   const lessonEl = document.getElementById("lesson-content");
-  lessonEl.dataset.lessonId = lesson.id || lesson.slug || ""; // use whatever identifier you prefer
+  document.getElementById("lesson-title").textContent = lesson.title;
+  lessonEl.dataset.lessonId = lesson.id || lesson.slug || "";
   lessonEl.innerHTML = marked.parse(lessonText);
 
-// attach autosave inputs (localStorage + optional Supabase)
-  let userId = ctx.user?.id; // since you already got ctx at the top
-  window.attachLessonInputs({ lessonId: lessonEl.dataset.lessonId, userId });
-
+  // attach autosave inputs
+  window.attachLessonInputs({ lessonId: lessonEl.dataset.lessonId, userId: ctx.user.id });
 
   // render quiz
   const quizForm = document.getElementById("quiz-form");
   quizForm.innerHTML = quizJson.questions.map((q, idx) => {
     let imageHtml = q.image ? `<div><img src="${q.image}" alt="Question image" style="max-width:200px; margin:8px 0;"></div>` : "";
-  
     if (q.type === "mcq") {
       return `
         <fieldset>
@@ -101,6 +94,8 @@
     }
   }).join("");
 
+  // show submit button once everything is ready
+  document.getElementById("submit").style.display = "inline-block";
 
   // handle submission
   document.getElementById("submit").onclick = async (e) => {
@@ -109,43 +104,40 @@
     const resultsDiv = document.getElementById("results");
     resultsDiv.innerHTML = "";
 
-  quizJson.questions.forEach((q, idx) => {
-    let correct = false;
-    if (q.type === "mcq") {
-      const selected = document.querySelector(`input[name="${q.id}"]:checked`);
-      if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
-    } else if (q.type === "input") {
-      const entered = document.querySelector(`input[name="${q.id}"]`).value.trim();
-      if (entered.toLowerCase() === q.correctAnswer.toLowerCase()) correct = true;
-    }
+    quizJson.questions.forEach((q, idx) => {
+      let correct = false;
+      if (q.type === "mcq") {
+        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+        if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
+      } else if (q.type === "input") {
+        const entered = document.querySelector(`input[name="${q.id}"]`).value.trim();
+        if (entered.toLowerCase() === q.correctAnswer.toLowerCase()) correct = true;
+      }
 
-    if (correct) score += 1;
-    resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
-      ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
-      <em>${q.explain}</em></p>`;
-  });
+      if (correct) score += 1;
+      resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
+        ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
+        <em>${q.explain}</em></p>`;
+    });
 
-  const percent = Math.round((score / quizJson.questions.length) * 100);
-  resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
+    const percent = Math.round((score / quizJson.questions.length) * 100);
+    resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
 
-  // record attempt in Supabase
-  await api.recordAttempt(lesson.id, ctx.user.id, percent);
+    // record attempt
+    await api.recordAttempt(lesson.id, ctx.user.id, percent);
 
-  // 🔹 hide Submit button
-  document.getElementById("submit").style.display = "none";
+    // hide Submit button and show retake
+    document.getElementById("submit").style.display = "none";
+    resultsDiv.innerHTML += `
+      <div id="retake-box" style="margin-top:1em;">
+        <button id="retake-btn" class="secondary">Send retake message</button>
+      </div>
+    `;
 
-  // 🔹 show retake message
-  resultsDiv.innerHTML += `
-    <div id="retake-box" style="margin-top:1em;">
-      <button id="retake-btn" class="secondary">Send retake message</button>
-    </div>
-  `;
-
-  document.getElementById("retake-btn").onclick = () => {
-    alert("Retake request sent! (parent dashboard will handle approval)");
+    document.getElementById("retake-btn").onclick = () => {
+      alert("Retake request sent! (parent dashboard will handle approval)");
+    };
   };
-};
-
 })();
 </script>
 </body>
