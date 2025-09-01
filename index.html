@@ -77,7 +77,7 @@
   // If you want students to ONLY see their own assigned lessons, use:
   //   const lessons = await api.listLessonsAssignedToCurrentUser();
   // If you want everyone to see all lessons in the DB, use:
-  const lessons  = await api.listAllLessonsForSite();
+  const lessons  = await api.listLessonsAssignedToCurrentUser();
 
   const attempts = await api.listAttemptsForUserAll(userId);
 
