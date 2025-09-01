@@ -124,7 +124,13 @@
     resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
 
     // record attempt
-    await api.recordAttempt(lesson.id, ctx.user.id, percent);
+    const { data: { user } } = await sb.supabase.auth.getUser();
+    const { error } = await api.recordAttempt(lesson.id, user.id, percent);
+    if (error) {
+      console.error("Failed to save attempt:", error.message);
+      alert("Could not save your score: " + error.message);
+      return;
+    }
 
     // hide Submit button and show retake
     document.getElementById("submit").style.display = "none";
