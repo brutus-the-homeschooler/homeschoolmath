@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="assets/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
   <script src="assets/lesson-inputs.js"></script>
@@ -61,38 +62,47 @@
   const lessonEl = document.getElementById("lesson-content");
   document.getElementById("lesson-title").textContent = lesson.title;
   lessonEl.dataset.lessonId = lesson.id || lesson.slug || "";
-  lessonEl.innerHTML = marked.parse(lessonText);
+  lessonEl.innerHTML = DOMPurify.sanitize(marked.parse(lessonText));
 
   // attach autosave inputs
   window.attachLessonInputs({ lessonId: lessonEl.dataset.lessonId, userId: ctx.user.id });
 
   // render quiz
   const quizForm = document.getElementById("quiz-form");
-  quizForm.innerHTML = quizJson.questions.map((q, idx) => {
-    let imageHtml = q.image ? `<div><img src="${q.image}" alt="Question image" style="max-width:200px; margin:8px 0;"></div>` : "";
+  const quizHtml = quizJson.questions.map((q, idx) => {
+    const prompt = DOMPurify.sanitize(q.prompt);
+    const id = DOMPurify.sanitize(q.id);
+    const imageHtml = q.image
+      ? `<div><img src="${DOMPurify.sanitize(q.image)}" alt="Question image" style="max-width:200px; margin:8px 0;"></div>`
+      : "";
     if (q.type === "mcq") {
+      const choices = q.choices
+        .map(
+          (choice, i) => `
+            <label>
+              <input type="radio" name="${id}" value="${i}">
+              ${DOMPurify.sanitize(choice)}
+            </label><br>`
+        )
+        .join("");
       return `
         <fieldset>
-          <legend>${idx+1}. ${q.prompt}</legend>
+          <legend>${idx + 1}. ${prompt}</legend>
           ${imageHtml}
-          ${q.choices.map((choice, i) => `
-            <label>
-              <input type="radio" name="${q.id}" value="${i}">
-              ${choice}
-            </label><br>
-          `).join('')}
+          ${choices}
         </fieldset>
       `;
     } else if (q.type === "input") {
       return `
         <fieldset>
-          <legend>${idx+1}. ${q.prompt}</legend>
+          <legend>${idx + 1}. ${prompt}</legend>
           ${imageHtml}
-          <input type="text" name="${q.id}" placeholder="Type your answer">
+          <input type="text" name="${id}" placeholder="Type your answer">
         </fieldset>
       `;
     }
   }).join("");
+  quizForm.innerHTML = DOMPurify.sanitize(quizHtml);
 
   // show submit button once everything is ready
   document.getElementById("submit").style.display = "inline-block";
@@ -107,10 +117,10 @@
     quizJson.questions.forEach((q, idx) => {
       let correct = false;
       if (q.type === "mcq") {
-        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+        const selected = document.querySelector(`input[name="${DOMPurify.sanitize(q.id)}"]:checked`);
         if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
       }  else if (q.type === "input") {
-        const el = document.querySelector(`input[name="${q.id}"]`);
+        const el = document.querySelector(`input[name="${DOMPurify.sanitize(q.id)}"]`);
         const entered = el ? el.value.trim() : "";
         if (entered && q.correctAnswer && entered.toLowerCase() === q.correctAnswer.toLowerCase()) {
           correct = true;
@@ -120,9 +130,9 @@
 
 
       if (correct) score += 1;
-      resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
+      resultsDiv.innerHTML += DOMPurify.sanitize(`<p>${idx + 1}. ${DOMPurify.sanitize(q.prompt)}<br>
         ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
-        <em>${q.explain}</em></p>`;
+        <em>${DOMPurify.sanitize(q.explain)}</em></p>`);
     });
 
     const percent = Math.round((score / quizJson.questions.length) * 100);
