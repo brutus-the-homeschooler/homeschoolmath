@@ -10,7 +10,7 @@
   <script src="assets/api.js"></script>
 </head>
 <body>
-<header>
+<header style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
   <h1>Parent Dashboard</h1>
   <div id="auth"></div>
 </header>
@@ -22,6 +22,8 @@
 
     <div id="summary" style="margin-top:1rem;"></div>
     <div id="details" style="margin-top:2rem;"></div>
+
+    <button onclick="window.location.href='index.html'" style="margin-top:2rem;">⬅ Back to Dashboard</button>
   </section>
 </main>
 
@@ -33,7 +35,6 @@
   const summaryEl = document.getElementById("summary");
   const detailsEl = document.getElementById("details");
 
-  // --- Auth ---
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
     authEl.innerHTML = `
@@ -57,30 +58,45 @@
     controls.style.display = "block";
   }
 
-  // --- Load students ---
-  const { data: students, error: stuErr } = await sb.supabase
-    .from("profiles")
-    .select("user_id, display_name")
-    .eq("role", "student");
+  const { data: students } = await sb.supabase.from("profiles").select("user_id, display_name").eq("role", "student");
+  studentSel.innerHTML = students.map(s => `<option value="${s.user_id}">${s.display_name}</option>`).join("");
 
-  if (stuErr) {
-    summaryEl.innerHTML = `<p class="muted">Error loading students: ${stuErr.message}</p>`;
-    return;
+  async function listFiles(folder) {
+    const names = new Set();
+    let page = 0, pageSize = 100;
+    while (true) {
+      const { data, error } = await sb.supabase
+        .storage.from("content")
+        .list(folder, { limit: pageSize, offset: page*pageSize });
+      if (error) break;
+      (data || []).forEach(f => names.add(f.name));
+      if (!data || data.length < pageSize) break;
+      page++;
+    }
+    return names;
   }
 
-  studentSel.innerHTML = students.map(s => 
-    `<option value="${s.user_id}">${s.display_name}</option>`).join("");
+  async function filterItemsByStorage(items, folder) {
+    const names = await listFiles(folder);
+    return items.filter(i => {
+      const mdName = i.md_path?.split("/").pop();
+      const qzName = i.quiz_path?.split("/").pop();
+      return names.has(mdName) && names.has(qzName);
+    });
+  }
 
-  // --- Load summary + details for selected student ---
-  async function loadSummary(studentId) {
-    const { data: lessons } = await sb.supabase.from("lesson_with_attempts").select("*").eq("user_id", studentId);
-    const { data: tests }   = await sb.supabase.from("tests_with_attempts").select("*").eq("user_id", studentId);
+  async function loadSummary(studentId, displayName) {
+    let { data: lessons } = await sb.supabase.from("lesson_with_attempts").select("*").eq("user_id", studentId);
+    let { data: tests }   = await sb.supabase.from("tests_with_attempts").select("*").eq("user_id", studentId);
 
-    const completedLessons = (lessons || []).filter(l => l.score != null);
-    const remainingLessons = (lessons || []).filter(l => l.score == null);
+    lessons = await filterItemsByStorage(lessons || [], `${displayName}/lessons`);
+    tests   = await filterItemsByStorage(tests || [], `${displayName}/tests`);
 
-    const completedTests = (tests || []).filter(t => t.score != null);
-    const remainingTests = (tests || []).filter(t => t.score == null);
+    const completedLessons = lessons.filter(l => l.score != null);
+    const remainingLessons = lessons.filter(l => l.score == null);
+
+    const completedTests = tests.filter(t => t.score != null);
+    const remainingTests = tests.filter(t => t.score == null);
 
     summaryEl.innerHTML = `
       <h3>Summary</h3>
@@ -90,33 +106,25 @@
 
     detailsEl.innerHTML = `
       <h3>Remaining Lessons</h3>
-      ${remainingLessons.length > 0 
-        ? `<ul>${remainingLessons.map(l => `<li>${l.title} — <span class="muted">Incomplete</span></li>`).join("")}</ul>`
-        : `<p class="muted">All lessons completed ✅</p>`}
+      ${remainingLessons.length > 0 ? `<ul>${remainingLessons.map(l => `<li>${l.title} — <span class="muted">Incomplete</span></li>`).join("")}</ul>` : `<p class="muted">All lessons completed ✅</p>`}
 
       <h3>Completed Lessons</h3>
-      ${completedLessons.length > 0
-        ? `<ul>${completedLessons.map(l => `<li>${l.title} — <strong>${l.score}%</strong></li>`).join("")}</ul>`
-        : `<p class="muted">No lessons completed yet.</p>`}
+      ${completedLessons.length > 0 ? `<ul>${completedLessons.map(l => `<li>${l.title} — <strong>${l.score}%</strong></li>`).join("")}</ul>` : `<p class="muted">No lessons completed yet.</p>`}
 
       <h3>Remaining Tests</h3>
-      ${remainingTests.length > 0 
-        ? `<ul>${remainingTests.map(t => `<li>${t.title} — <span class="muted">Incomplete</span></li>`).join("")}</ul>`
-        : `<p class="muted">All tests completed ✅</p>`}
+      ${remainingTests.length > 0 ? `<ul>${remainingTests.map(t => `<li>${t.title} — <span class="muted">Incomplete</span></li>`).join("")}</ul>` : `<p class="muted">All tests completed ✅</p>`}
 
       <h3>Completed Tests</h3>
-      ${completedTests.length > 0
-        ? `<ul>${completedTests.map(t => `<li>${t.title} — <strong>${t.score}%</strong></li>`).join("")}</ul>`
-        : `<p class="muted">No tests completed yet.</p>`}
+      ${completedTests.length > 0 ? `<ul>${completedTests.map(t => `<li>${t.title} — <strong>${t.score}%</strong></li>`).join("")}</ul>` : `<p class="muted">No tests completed yet.</p>`}
     `;
   }
 
   if (students.length > 0) {
-    await loadSummary(students[0].user_id);
+    await loadSummary(students[0].user_id, students[0].display_name);
   }
-
   studentSel.onchange = async () => {
-    await loadSummary(studentSel.value);
+    const selected = students.find(s => s.user_id === studentSel.value);
+    await loadSummary(studentSel.value, selected.display_name);
   };
 })();
 </script>
