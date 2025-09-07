@@ -46,11 +46,10 @@
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
     authEl.innerHTML = `
-      <input id="email" type="text" placeholder="Email" autocapitalize="none" autocomplete="username">
-      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-      <button class="primary" id="login">Login</button>
+      <input id="email" type="text" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <button id="login">Login</button>
     `;
-
     const doLogin = async () => {
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
@@ -58,12 +57,8 @@
       const user = await api.signInWithPassword(email, password);
       if (user) location.reload();
     };
-
     document.getElementById('login').onclick = doLogin;
-    document.getElementById('password').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') doLogin();
-    });
-
+    document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
     lessonsEl.innerHTML = '<li>Sign in to view lessons.</li>';
     testsEl.innerHTML   = '<li>Sign in to view tests.</li>';
     return;
@@ -75,13 +70,12 @@
 
   const userId = ctx.user.id;
 
-  // ----- Fetch from views -----
+  // ----- Fetch -----
   async function fetchLessonsWithAttempts() {
     const { data, error } = await sb.supabase
       .from("lesson_with_attempts")
       .select("*")
-      .eq("user_id", ctx.user.id);
-
+      .eq("user_id", userId);
     if (error) {
       console.error("Error fetching lessons:", error.message);
       return [];
@@ -93,8 +87,7 @@
     const { data, error } = await sb.supabase
       .from("tests_with_attempts")
       .select("*")
-      .eq("user_id", ctx.user.id);
-
+      .eq("user_id", userId);
     if (error) {
       console.error("Error fetching tests:", error.message);
       return [];
@@ -105,7 +98,7 @@
   // ----- Render -----
   function renderItems(items, containerEl, type, filterMode) {
     const filtered = items.filter(i => {
-      const done = i.score !== null;
+      const done = i.score != null; // true if score is not null/undefined
       if (filterMode === "completed") return done;
       if (filterMode === "pending")   return !done;
       return true;
@@ -117,18 +110,17 @@
     }
 
     containerEl.innerHTML = filtered.map(i => {
-      const done = i.score !== null;
-      const best = done ? i.score : null;
-
+      const done = i.score != null;
       return `
         <li style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.25rem 0;">
           <span>
             <a href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">${i.title}</a>
-            <small class="muted"> — for ${i.for_user}</small>
+            <small class="muted"> — for ${i.for_user ?? ""}</small>
           </span>
           <span style="display:flex;align-items:center;gap:.5rem;">
-            ${done ? `<span title="Completed">✅</span>` : ``}
-            ${best ? `<span class="badge">${best}%</span>` : ``}
+            ${done 
+              ? `<span title="Completed">✅</span><span class="badge">${i.score}%</span>` 
+              : `<span class="muted">Incomplete</span>`}
             <a class="button" href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">Open</a>
           </span>
         </li>
@@ -145,10 +137,10 @@
     renderItems(tests, testsEl, "tests", filterEl.value);
   }
 
+  // Restore filter from local storage
+  filterEl.value = localStorage.getItem("lessonFilter") || "all";
   doRender();
 
-  // Filter persistence
-  filterEl.value = localStorage.getItem("lessonFilter") || "all";
   filterEl.addEventListener("change", () => {
     localStorage.setItem("lessonFilter", filterEl.value);
     doRender();
