@@ -57,6 +57,16 @@ async function listLessonsAssignedToCurrentUser() {
   return data || [];
 }
 
+// From the view with attempts
+async function listLessonsWithAttempts(userId) {
+  const { data, error } = await sb.supabase
+    .from("lesson_with_attempts")
+    .select("*")
+    .eq("user_id", userId);
+  if (error) throw error;
+  return data || [];
+}
+
 // ---------- Tests ----------
 async function getTestBySlug(slug) {
   const { data, error } = await sb.supabase.from("tests").select("*").eq("slug", slug).maybeSingle();
@@ -77,28 +87,35 @@ async function listTestsAssignedToCurrentUser() {
   return data || [];
 }
 
-// ---------- Attempts ----------
-async function recordAttempt(itemId, userId, score, isTest = false) {
+// From the view with attempts
+async function listTestsWithAttempts(userId) {
   const { data, error } = await sb.supabase
+    .from("tests_with_attempts")
+    .select("*")
+    .eq("user_id", userId);
+  if (error) throw error;
+  return data || [];
+}
+
+// ---------- Attempts ----------
+async function upsertAttempt(mappingId, userId, score) {
+  const { error } = await sb.supabase
     .from("attempts")
-    .insert([
+    .upsert(
       {
-        lesson_id: isTest ? null : itemId,
-        test_id: isTest ? itemId : null,
+        mapping_id: mappingId,
         user_id: userId,
         score,
-        submitted_at: new Date().toISOString(),
       },
-    ])
-    .select()
-    .maybeSingle();
-  return { data, error };
+      { onConflict: "user_id,mapping_id" }
+    );
+  if (error) throw error;
 }
 
 async function listAttemptsForUserAll(userId) {
   const { data, error } = await sb.supabase
     .from("attempts")
-    .select("lesson_id, test_id, submitted_at, score")
+    .select("mapping_id, score")
     .eq("user_id", userId);
   if (error) throw error;
   return data || [];
@@ -106,22 +123,28 @@ async function listAttemptsForUserAll(userId) {
 
 // ---------- Exports ----------
 window.api = {
+  // Auth
   signIn,
   signInWithPassword,
   signOut,
 
+  // Date helpers
   todayLocalISO,
+
+  // Content
   fetchSignedText,
 
   // Lessons
   getLessonBySlug,
   listLessonsAssignedToCurrentUser,
+  listLessonsWithAttempts,
 
   // Tests
   getTestBySlug,
   listTestsAssignedToCurrentUser,
+  listTestsWithAttempts,
 
   // Attempts
-  recordAttempt,
+  upsertAttempt,
   listAttemptsForUserAll,
 };
