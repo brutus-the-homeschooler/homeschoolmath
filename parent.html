@@ -71,28 +71,34 @@
 
   // --- Load summary for selected student ---
   async function loadSummary(studentId) {
-    // Lessons
-    const { data: lessons } = await sb.supabase
-      .from("lessons")
-      .select("id, title");
-    const { data: lAttempts } = await sb.supabase
-      .from("attempts")
-      .select("mapping_id, score")
+    // Lessons with attempts
+    const { data: lessons, error: lErr } = await sb.supabase
+      .from("lesson_with_attempts")
+      .select("*")
       .eq("user_id", studentId);
 
-    const lessonIds = new Set(lessons.map(l => l.id));
-    const completedLessons = lAttempts.filter(a => lessonIds.has(a.mapping_id)).length;
+    if (lErr) {
+      summaryEl.innerHTML = `<p class="muted">Error loading lessons: ${lErr.message}</p>`;
+      return;
+    }
+
+    // Tests with attempts
+    const { data: tests, error: tErr } = await sb.supabase
+      .from("tests_with_attempts")
+      .select("*")
+      .eq("user_id", studentId);
+
+    if (tErr) {
+      summaryEl.innerHTML = `<p class="muted">Error loading tests: ${tErr.message}</p>`;
+      return;
+    }
+
+    // Count completed vs remaining
     const totalLessons = lessons.length;
-
-    // Tests
-    const { data: tests } = await sb.supabase
-      .from("tests")
-      .select("id, title");
-    const testIds = new Set(tests.map(t => t.id));
-    const completedTests = lAttempts.filter(a => testIds.has(a.mapping_id)).length;
+    const completedLessons = lessons.filter(l => l.score !== null).length;
     const totalTests = tests.length;
+    const completedTests = tests.filter(t => t.score !== null).length;
 
-    // Render summary
     summaryEl.innerHTML = `
       <h3>Summary</h3>
       <p><strong>Lessons:</strong> ${completedLessons} / ${totalLessons} completed (${totalLessons - completedLessons} remaining)</p>
