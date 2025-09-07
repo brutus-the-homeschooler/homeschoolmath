@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Math — Test</title>
   <link rel="stylesheet" href="assets/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
@@ -36,20 +37,18 @@
   }
   const userId = ctx.user.id;
 
-  // Get slug from URL
   const urlParams = new URLSearchParams(window.location.search);
   const slug = urlParams.get("slug");
+  const BUCKET = "content";
+  const userFolder = ctx.profile.display_name;
 
-  // Load test record
-  const test = await api.getTestBySlug(slug);
-  if (!test) {
-    document.getElementById("content").innerHTML = "<p>Test not found.</p>";
-    return;
-  }
+  // Build paths for md + quiz
+  const mdPath = `${userFolder}/tests/${slug}.md`;
+  const quizPath = `${userFolder}/tests/questions/${slug}.json`;
 
-  // Fetch markdown + JSON
-  const md = await api.fetchSignedText(test.md_path);
-  const quiz = JSON.parse(await api.fetchSignedText(test.quiz_path));
+  // Fetch markdown + quiz
+  const md = await api.fetchSignedText(mdPath);
+  const quiz = JSON.parse(await api.fetchSignedText(quizPath));
 
   // Render markdown
   document.getElementById("markdown").innerHTML = marked.parse(md);
@@ -85,7 +84,7 @@
     });
     const score = Math.round((correct / quiz.questions.length) * 100);
     document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
-    await api.recordAttempt(test.id, userId, score, true);
+    await api.recordAttempt(slug, userId, score, true);
   };
 })();
 </script>
