@@ -27,14 +27,14 @@
 
 <script>
 (async () => {
-  const authEl = document.getElementById('auth');
+  const authEl   = document.getElementById('auth');
   const lessonsEl = document.getElementById('lessons');
-  const testsEl = document.getElementById('tests');
+  const testsEl   = document.getElementById('tests');
 
   // ----- Auth -----
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
-    authEl.innerHTML = `Please log in`;
+    authEl.innerHTML = "Please log in.";
     return;
   } else {
     authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span>
@@ -42,32 +42,64 @@
     document.getElementById('logout').onclick = api.signOut;
   }
 
-  const userId = ctx.user.id;
+  const BUCKET = 'content';
+  const userFolder = ctx.profile.display_name;
+
+  async function listAllNamesInFolder(bucket, folder) {
+    const names = new Set();
+    const pageSize = 100;
+    let offset = 0;
+    while (true) {
+      const { data, error } = await sb.supabase
+        .storage.from(bucket)
+        .list(folder, { limit: pageSize, offset, sortBy: { column: 'name', order: 'asc' } });
+      if (error) break;
+      (data || []).forEach(entry => {
+        if (entry.name) names.add(entry.name);
+      });
+      if (!data || data.length < pageSize) break;
+      offset += pageSize;
+    }
+    return names;
+  }
 
   // ----- Lessons -----
-  const lessons = await api.listLessonsAssignedToCurrentUser();
-  if (!lessons.length) {
+  const lessonFiles = await listAllNamesInFolder(BUCKET, `${userFolder}/lessons`);
+  const quizFiles   = await listAllNamesInFolder(BUCKET, `${userFolder}/quizzes`);
+
+  if (!lessonFiles.size) {
     lessonsEl.innerHTML = '<li>No lessons found.</li>';
   } else {
-    lessonsEl.innerHTML = lessons.map(L => `
-      <li>
-        <a href="lesson.html?slug=${encodeURIComponent(L.slug)}">${L.title}</a>
-        <small class="muted"> — for ${L.for_user}</small>
-      </li>
-    `).join('');
+    lessonsEl.innerHTML = Array.from(lessonFiles).filter(f => f.endsWith('.md')).map(name => {
+      const slug = name.replace('.md','');
+      return `
+        <li>
+          <a href="lesson.html?slug=${encodeURIComponent(slug)}">${slug.replace(/-/g,' ')}</a>
+        </li>
+      `;
+    }).join('');
   }
 
   // ----- Tests -----
-  const tests = await api.listTestsAssignedToCurrentUser();
+  const testMdFiles   = await listAllNamesInFolder(BUCKET, `${userFolder}/tests`);
+  const testQuizFiles = await listAllNamesInFolder(BUCKET, `${userFolder}/tests/questions`);
+
+  const tests = Array.from(testMdFiles).filter(f => f.endsWith('.md')).filter(mdName => {
+    const base = mdName.replace('.md','');
+    return testQuizFiles.has(`${base}.json`);
+  });
+
   if (!tests.length) {
     testsEl.innerHTML = '<li>No tests found.</li>';
   } else {
-    testsEl.innerHTML = tests.map(T => `
-      <li>
-        <a href="test.html?slug=${encodeURIComponent(T.slug)}">${T.title}</a>
-        <small class="muted"> — for ${T.for_user}</small>
-      </li>
-    `).join('');
+    testsEl.innerHTML = tests.map(name => {
+      const slug = name.replace('.md','');
+      return `
+        <li>
+          <a href="test.html?slug=${encodeURIComponent(slug)}">Test – ${slug.replace(/-/g,' ')}</a>
+        </li>
+      `;
+    }).join('');
   }
 })();
 </script>
