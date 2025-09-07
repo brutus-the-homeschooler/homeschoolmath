@@ -21,6 +21,8 @@
     <select id="student"></select>
 
     <div id="summary" style="margin-top:1rem;"></div>
+
+    <div id="details" style="margin-top:2rem;"></div>
   </section>
 </main>
 
@@ -30,6 +32,7 @@
   const controls = document.getElementById("controls");
   const studentSel = document.getElementById("student");
   const summaryEl = document.getElementById("summary");
+  const detailsEl = document.getElementById("details");
 
   // --- Auth ---
   const ctx = await sb.currentUserWithProfile();
@@ -58,7 +61,7 @@
   // --- Load students ---
   const { data: students, error: stuErr } = await sb.supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("user_id, display_name")
     .eq("role", "student");
 
   if (stuErr) {
@@ -67,9 +70,9 @@
   }
 
   studentSel.innerHTML = students.map(s => 
-    `<option value="${s.id}">${s.display_name}</option>`).join("");
+    `<option value="${s.user_id}">${s.display_name}</option>`).join("");
 
-  // --- Load summary for selected student ---
+  // --- Load summary + details for selected student ---
   async function loadSummary(studentId) {
     // Lessons with attempts
     const { data: lessons, error: lErr } = await sb.supabase
@@ -93,22 +96,47 @@
       return;
     }
 
-    // Count completed vs remaining
-    const totalLessons = lessons.length;
-    const completedLessons = lessons.filter(l => l.score !== null).length;
-    const totalTests = tests.length;
-    const completedTests = tests.filter(t => t.score !== null).length;
+    // Split completed vs remaining
+    const completedLessons = lessons.filter(l => l.score !== null);
+    const remainingLessons = lessons.filter(l => l.score === null);
 
+    const completedTests = tests.filter(t => t.score !== null);
+    const remainingTests = tests.filter(t => t.score === null);
+
+    // Render summary
     summaryEl.innerHTML = `
       <h3>Summary</h3>
-      <p><strong>Lessons:</strong> ${completedLessons} / ${totalLessons} completed (${totalLessons - completedLessons} remaining)</p>
-      <p><strong>Tests:</strong> ${completedTests} / ${totalTests} completed (${totalTests - completedTests} remaining)</p>
+      <p><strong>Lessons:</strong> ${completedLessons.length} / ${lessons.length} completed (${remainingLessons.length} remaining)</p>
+      <p><strong>Tests:</strong> ${completedTests.length} / ${tests.length} completed (${remainingTests.length} remaining)</p>
+    `;
+
+    // Render details
+    detailsEl.innerHTML = `
+      <h3>Remaining Lessons</h3>
+      ${remainingLessons.length > 0 
+        ? `<ul>${remainingLessons.map(l => `<li>${l.title}</li>`).join("")}</ul>`
+        : `<p class="muted">All lessons completed ✅</p>`}
+
+      <h3>Completed Lessons</h3>
+      ${completedLessons.length > 0
+        ? `<ul>${completedLessons.map(l => `<li>${l.title} — <strong>${l.score}%</strong></li>`).join("")}</ul>`
+        : `<p class="muted">No lessons completed yet.</p>`}
+
+      <h3>Remaining Tests</h3>
+      ${remainingTests.length > 0 
+        ? `<ul>${remainingTests.map(t => `<li>${t.title}</li>`).join("")}</ul>`
+        : `<p class="muted">All tests completed ✅</p>`}
+
+      <h3>Completed Tests</h3>
+      ${completedTests.length > 0
+        ? `<ul>${completedTests.map(t => `<li>${t.title} — <strong>${t.score}%</strong></li>`).join("")}</ul>`
+        : `<p class="muted">No tests completed yet.</p>`}
     `;
   }
 
   // Load first student by default
   if (students.length > 0) {
-    await loadSummary(students[0].id);
+    await loadSummary(students[0].user_id);
   }
 
   // Change student
