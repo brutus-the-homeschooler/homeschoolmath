@@ -80,8 +80,7 @@
     const { data, error } = await sb.supabase
       .from("lesson_with_attempts")
       .select("*")
-      .eq("for_user", ctx.profile.display_name)
-      .eq("user_id", userId);
+      .eq("user_id", ctx.user.id);
 
     if (error) {
       console.error("Error fetching lessons:", error.message);
@@ -94,8 +93,7 @@
     const { data, error } = await sb.supabase
       .from("tests_with_attempts")
       .select("*")
-      .eq("for_user", ctx.profile.display_name)
-      .eq("user_id", userId);
+      .eq("user_id", ctx.user.id);
 
     if (error) {
       console.error("Error fetching tests:", error.message);
