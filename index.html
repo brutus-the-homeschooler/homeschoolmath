@@ -12,6 +12,16 @@
 <body>
 <header style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
   <h1>Math — Dashboard</h1>
+
+  <div style="display:flex;align-items:center;gap:.5rem;">
+    <label for="lesson-filter">Show:</label>
+    <select id="lesson-filter">
+      <option value="all">All</option>
+      <option value="completed">Completed only</option>
+      <option value="pending">Not completed only</option>
+    </select>
+  </div>
+
   <div id="auth"></div>
 </header>
 
@@ -30,17 +40,16 @@
   const authEl    = document.getElementById('auth');
   const lessonsEl = document.getElementById('lessons');
   const testsEl   = document.getElementById('tests');
+  const filterEl  = document.getElementById('lesson-filter');
 
   // ----- Auth -----
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
-    // Restore login form
     authEl.innerHTML = `
       <input id="email" type="text" placeholder="Email" autocapitalize="none" autocomplete="username">
       <input id="password" type="password" placeholder="Password" autocomplete="current-password">
       <button class="primary" id="login">Login</button>
     `;
-
     const doLogin = async () => {
       const btn = document.getElementById('login');
       const email = document.getElementById('email').value.trim();
@@ -51,12 +60,8 @@
       if (user) location.reload();
       btn.disabled = false;
     };
-
     document.getElementById('login').onclick = doLogin;
-    document.getElementById('password').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') doLogin();
-    });
-
+    document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
     lessonsEl.innerHTML = '<li>Sign in to view lessons.</li>';
     testsEl.innerHTML   = '<li>Sign in to view tests.</li>';
     return;
@@ -66,65 +71,85 @@
     document.getElementById('logout').onclick = api.signOut;
   }
 
-  const BUCKET = 'content';
-  const userFolder = ctx.profile.display_name;
+  const userId = ctx.user.id;
 
-  async function listAllNamesInFolder(bucket, folder) {
-    const names = new Set();
-    const pageSize = 100;
-    let offset = 0;
-    while (true) {
-      const { data, error } = await sb.supabase
-        .storage.from(bucket)
-        .list(folder, { limit: pageSize, offset, sortBy: { column: 'name', order: 'asc' } });
-      if (error) break;
-      (data || []).forEach(entry => {
-        if (entry.name) names.add(entry.name);
-      });
-      if (!data || data.length < pageSize) break;
-      offset += pageSize;
+  // ----- Query helper -----
+  async function fetchLessonsWithAttempts() {
+    const { data, error } = await sb.supabase
+      .from("lessons")
+      .select("id, slug, title, for_user, points, attempts(score, submitted_at)")
+      .eq("for_user", ctx.profile.display_name)
+      .eq("attempts.user_id", userId);
+    if (error) {
+      console.error("Error fetching lessons:", error.message);
+      return [];
     }
-    return names;
+    return data || [];
   }
 
-  // ----- Lessons -----
-  const lessonFiles = await listAllNamesInFolder(BUCKET, `${userFolder}/lessons`);
-  const quizFiles   = await listAllNamesInFolder(BUCKET, `${userFolder}/quizzes`);
+  async function fetchTestsWithAttempts() {
+    const { data, error } = await sb.supabase
+      .from("tests")
+      .select("id, slug, title, for_user, points, attempts(score, submitted_at)")
+      .eq("for_user", ctx.profile.display_name)
+      .eq("attempts.user_id", userId);
+    if (error) {
+      console.error("Error fetching tests:", error.message);
+      return [];
+    }
+    return data || [];
+  }
 
-  if (!lessonFiles.size) {
-    lessonsEl.innerHTML = '<li>No lessons found.</li>';
-  } else {
-    lessonsEl.innerHTML = Array.from(lessonFiles).filter(f => f.endsWith('.md')).map(name => {
-      const slug = name.replace('.md','');
+  // ----- Render helpers -----
+  function renderItems(items, containerEl, type, filterMode) {
+    const filtered = items.filter(i => {
+      const done = i.attempts && i.attempts.length > 0 && i.attempts[0].score !== null;
+      if (filterMode === "completed") return done;
+      if (filterMode === "pending")   return !done;
+      return true;
+    });
+
+    if (!filtered.length) {
+      containerEl.innerHTML = `<li>No ${type} found.</li>`;
+      return;
+    }
+
+    containerEl.innerHTML = filtered.map(i => {
+      const attempt = (i.attempts && i.attempts[0]) || null;
+      const done = attempt && attempt.score !== null;
+      const best = done ? attempt.score : null;
+
       return `
-        <li>
-          <a href="lesson.html?slug=${encodeURIComponent(slug)}">${slug.replace(/-/g,' ')}</a>
+        <li style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.25rem 0;">
+          <span>
+            <a href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">${i.title}</a>
+            <small class="muted"> — for ${i.for_user}</small>
+          </span>
+          <span style="display:flex;align-items:center;gap:.5rem;">
+            ${done ? `<span title="Completed">✅</span>` : ``}
+            ${best ? `<span class="badge">${best}%</span>` : ``}
+            <a class="button" href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">Open</a>
+          </span>
         </li>
       `;
     }).join('');
   }
 
-  // ----- Tests -----
-  const testMdFiles   = await listAllNamesInFolder(BUCKET, `${userFolder}/tests`);
-  const testQuizFiles = await listAllNamesInFolder(BUCKET, `${userFolder}/tests/questions`);
+  // ----- Initial fetch + render -----
+  let lessons = await fetchLessonsWithAttempts();
+  let tests   = await fetchTestsWithAttempts();
 
-  const tests = Array.from(testMdFiles).filter(f => f.endsWith('.md')).filter(mdName => {
-    const base = mdName.replace('.md','');
-    return testQuizFiles.has(`${base}.json`);
+  function doRender() {
+    renderItems(lessons, lessonsEl, "lessons", filterEl.value);
+    renderItems(tests, testsEl, "tests", filterEl.value);
+  }
+
+  doRender();
+  filterEl.value = localStorage.getItem("lessonFilter") || "all";
+  filterEl.addEventListener("change", () => {
+    localStorage.setItem("lessonFilter", filterEl.value);
+    doRender();
   });
-
-  if (!tests.length) {
-    testsEl.innerHTML = '<li>No tests found.</li>';
-  } else {
-    testsEl.innerHTML = tests.map(name => {
-      const slug = name.replace('.md','');
-      return `
-        <li>
-          <a href="test.html?slug=${encodeURIComponent(slug)}">Test – ${slug.replace(/-/g,' ')}</a>
-        </li>
-      `;
-    }).join('');
-  }
 })();
 </script>
 </body>
