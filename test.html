@@ -25,30 +25,36 @@
 
 <script>
 (async () => {
-  const authEl = document.getElementById('auth');
+  const authEl = document.getElementById("auth");
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
     authEl.innerHTML = "Please log in.";
     return;
   } else {
-    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span>
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? "User"}</span>
                         <button id="logout">Sign out</button>`;
-    document.getElementById('logout').onclick = api.signOut;
+    document.getElementById("logout").onclick = api.signOut;
   }
   const userId = ctx.user.id;
 
   const urlParams = new URLSearchParams(window.location.search);
   const slug = urlParams.get("slug");
-  const BUCKET = "content";
-  const userFolder = ctx.profile.display_name;
 
-  // Build paths for md + quiz
-  const mdPath = `${userFolder}/tests/${slug}.md`;
-  const quizPath = `${userFolder}/tests/questions/${slug}.json`;
+  // 1. Fetch test row
+  const { data: test, error } = await sb.supabase
+    .from("tests")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
 
-  // Fetch markdown + quiz
-  const md = await api.fetchSignedText(mdPath);
-  const quiz = JSON.parse(await api.fetchSignedText(quizPath));
+  if (error || !test) {
+    document.getElementById("content").innerHTML = "<p>Test not found.</p>";
+    return;
+  }
+
+  // 2. Fetch markdown + quiz
+  const md = await api.fetchSignedText(test.md_path);
+  const quiz = JSON.parse(await api.fetchSignedText(test.quiz_path));
 
   // Render markdown
   document.getElementById("markdown").innerHTML = marked.parse(md);
@@ -84,7 +90,13 @@
     });
     const score = Math.round((correct / quiz.questions.length) * 100);
     document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
-    await api.recordAttempt(slug, userId, score, true);
+
+    // Save attempt tied to mapping_id (test.id)
+    await sb.supabase.from("attempts").insert({
+      user_id: userId,
+      mapping_id: test.id,
+      score
+    });
   };
 })();
 </script>
