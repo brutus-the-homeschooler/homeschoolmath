@@ -69,36 +69,45 @@
   }
 
   const userId = ctx.user.id;
+  const BUCKET = "content";
 
-  // ----- Fetch -----
-  async function fetchLessonsWithAttempts() {
-    const { data, error } = await sb.supabase
-      .from("lesson_with_attempts")
-      .select("*")
-      .eq("for_user", ctx.profile.display_name);
-    if (error) {
-      console.error("Error fetching lessons:", error.message);
-      return [];
+  async function listFiles(folder) {
+    const names = new Set();
+    let page = 0, pageSize = 100;
+    while (true) {
+      const { data, error } = await sb.supabase
+        .storage.from(BUCKET)
+        .list(folder, { limit: pageSize, offset: page*pageSize });
+      if (error) break;
+      (data || []).forEach(f => names.add(f.name));
+      if (!data || data.length < pageSize) break;
+      page++;
     }
+    return names;
+  }
+
+  async function filterItemsByStorage(items, folder) {
+    const names = await listFiles(folder);
+    return items.filter(i => {
+      const mdName = i.md_path?.split("/").pop();
+      const qzName = i.quiz_path?.split("/").pop();
+      return names.has(mdName) && names.has(qzName);
+    });
+  }
+
+  async function fetchLessonsWithAttempts() {
+    const { data } = await sb.supabase.from("lesson_with_attempts").select("*").eq("user_id", userId);
     return data || [];
   }
 
   async function fetchTestsWithAttempts() {
-    const { data, error } = await sb.supabase
-      .from("tests_with_attempts")
-      .select("*")
-      .eq("for_user", ctx.profile.display_name);
-    if (error) {
-      console.error("Error fetching tests:", error.message);
-      return [];
-    }
+    const { data } = await sb.supabase.from("tests_with_attempts").select("*").eq("user_id", userId);
     return data || [];
   }
 
-  // ----- Render -----
   function renderItems(items, containerEl, type, filterMode) {
     const filtered = items.filter(i => {
-      const done = i.score != null; // true if score is not null/undefined
+      const done = i.score != null;
       if (filterMode === "completed") return done;
       if (filterMode === "pending")   return !done;
       return true;
@@ -128,16 +137,17 @@
     }).join('');
   }
 
-  // ----- Initial fetch -----
   let lessons = await fetchLessonsWithAttempts();
-  let tests   = await fetchTestsWithAttempts();
+  lessons = await filterItemsByStorage(lessons, `${ctx.profile.display_name}/lessons`);
+
+  let tests = await fetchTestsWithAttempts();
+  tests = await filterItemsByStorage(tests, `${ctx.profile.display_name}/tests`);
 
   function doRender() {
     renderItems(lessons, lessonsEl, "lessons", filterEl.value);
     renderItems(tests, testsEl, "tests", filterEl.value);
   }
 
-  // Restore filter from local storage
   filterEl.value = localStorage.getItem("lessonFilter") || "all";
   doRender();
 
