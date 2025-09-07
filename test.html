@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Math — Test</title>
+  <link rel="stylesheet" href="assets/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/api.js"></script>
+</head>
+<body>
+<header>
+  <h1>Math — Test</h1>
+  <div id="auth"></div>
+</header>
+
+<main id="content" class="card">
+  <div id="markdown">Loading test…</div>
+  <form id="quiz"></form>
+  <button id="submit" class="primary">Submit Test</button>
+  <div id="result"></div>
+</main>
+
+<script>
+(async () => {
+  const authEl = document.getElementById('auth');
+  const ctx = await sb.currentUserWithProfile();
+  if (!ctx) {
+    authEl.innerHTML = "Please log in.";
+    return;
+  } else {
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span>
+                        <button id="logout">Sign out</button>`;
+    document.getElementById('logout').onclick = api.signOut;
+  }
+  const userId = ctx.user.id;
+
+  // Get slug from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const slug = urlParams.get("slug");
+
+  // Load test record
+  const test = await api.getTestBySlug(slug);
+  if (!test) {
+    document.getElementById("content").innerHTML = "<p>Test not found.</p>";
+    return;
+  }
+
+  // Fetch markdown + JSON
+  const md = await api.fetchSignedText(test.md_path);
+  const quiz = JSON.parse(await api.fetchSignedText(test.quiz_path));
+
+  // Render markdown
+  document.getElementById("markdown").innerHTML = marked.parse(md);
+
+  // Render quiz
+  const quizEl = document.getElementById("quiz");
+  quiz.questions.forEach(q => {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.innerHTML = `<p>${q.prompt}</p>`;
+    if (q.type === "input") {
+      div.innerHTML += `<input type="text" data-id="${q.id}">`;
+    } else if (q.type === "mcq") {
+      q.choices.forEach((c, i) => {
+        div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${c}</label><br>`;
+      });
+    }
+    quizEl.appendChild(div);
+  });
+
+  // Handle submit
+  document.getElementById("submit").onclick = async (e) => {
+    e.preventDefault();
+    let correct = 0;
+    quiz.questions.forEach(q => {
+      if (q.type === "input") {
+        const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim();
+        if (val == q.answer) correct++;
+      } else if (q.type === "mcq") {
+        const checked = document.querySelector(`input[name="${q.id}"]:checked`);
+        if (checked && parseInt(checked.value) === q.answerIndex) correct++;
+      }
+    });
+    const score = Math.round((correct / quiz.questions.length) * 100);
+    document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
+    await api.recordAttempt(test.id, userId, score, true);
+  };
+})();
+</script>
+</body>
+</html>
