@@ -71,6 +71,7 @@
   const userId = ctx.user.id;
   const BUCKET = "content";
 
+  // ----- Helpers -----
   async function listFiles(folder) {
     const names = new Set();
     let page = 0, pageSize = 100;
@@ -105,12 +106,13 @@
     return data || [];
   }
 
+  // ----- Rendering -----
   function renderItems(items, containerEl, type, filterMode) {
     const filtered = items.filter(i => {
       const done = i.score != null;
       if (filterMode === "completed") return done;
       if (filterMode === "pending")   return !done;
-      return true;
+      return true; // all
     });
 
     if (!filtered.length) {
@@ -137,6 +139,7 @@
     }).join('');
   }
 
+  // ----- Initial fetch -----
   let lessons = await fetchLessonsWithAttempts();
   lessons = await filterItemsByStorage(lessons, `${ctx.profile.display_name}/lessons`);
 
@@ -148,6 +151,7 @@
     renderItems(tests, testsEl, "tests", filterEl.value);
   }
 
+  // Restore filter from local storage
   filterEl.value = localStorage.getItem("lessonFilter") || "all";
   doRender();
 
