@@ -37,10 +37,10 @@
 
 <script>
 (async () => {
-  const authEl    = document.getElementById('auth');
-  const lessonsEl = document.getElementById('lessons');
-  const testsEl   = document.getElementById('tests');
-  const filterEl  = document.getElementById('lesson-filter');
+  const authEl    = document.getElementById("auth");
+  const lessonsEl = document.getElementById("lessons");
+  const testsEl   = document.getElementById("tests");
+  const filterEl  = document.getElementById("lesson-filter");
 
   // ----- Auth -----
   const ctx = await sb.currentUserWithProfile();
@@ -51,25 +51,25 @@
       <button id="login">Login</button>
     `;
     const doLogin = async () => {
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
       if (!email || !password) { alert("Enter both email and password"); return; }
       const user = await api.signInWithPassword(email, password);
       if (user) location.reload();
     };
-    document.getElementById('login').onclick = doLogin;
-    document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-    lessonsEl.innerHTML = '<li>Sign in to view lessons.</li>';
-    testsEl.innerHTML   = '<li>Sign in to view tests.</li>';
+    document.getElementById("login").onclick = doLogin;
+    document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+    lessonsEl.innerHTML = "<li>Sign in to view lessons.</li>";
+    testsEl.innerHTML   = "<li>Sign in to view tests.</li>";
     return;
   } else {
-    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? 'User'}</span>
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? "User"}</span>
                         <button id="logout">Sign out</button>`;
-    document.getElementById('logout').onclick = api.signOut;
+    document.getElementById("logout").onclick = api.signOut;
   }
 
-  const userId = ctx.user.id;
   const BUCKET = "content";
+  const userFolder = ctx.profile.display_name;
 
   // ----- Helpers -----
   async function listFiles(folder) {
@@ -78,7 +78,7 @@
     while (true) {
       const { data, error } = await sb.supabase
         .storage.from(BUCKET)
-        .list(folder, { limit: pageSize, offset: page*pageSize });
+        .list(folder, { limit: pageSize, offset: page * pageSize });
       if (error) break;
       (data || []).forEach(f => names.add(f.name));
       if (!data || data.length < pageSize) break;
@@ -98,19 +98,27 @@
   }
 
   async function fetchLessonsWithAttempts() {
-    const { data } = await sb.supabase.from("lesson_with_attempts").select("*").eq("user_id", userId);
-    return data || [];
+    const { data, error } = await sb.supabase.from("lesson_with_attempts").select("*");
+    if (error) {
+      console.error("Error fetching lessons:", error.message);
+      return [];
+    }
+    return (data || []).filter(l => l.for_user === ctx.profile.display_name);
   }
 
   async function fetchTestsWithAttempts() {
-    const { data } = await sb.supabase.from("tests_with_attempts").select("*").eq("user_id", userId);
-    return data || [];
+    const { data, error } = await sb.supabase.from("tests_with_attempts").select("*");
+    if (error) {
+      console.error("Error fetching tests:", error.message);
+      return [];
+    }
+    return (data || []).filter(t => t.for_user === ctx.profile.display_name);
   }
 
   // ----- Rendering -----
   function renderItems(items, containerEl, type, filterMode) {
     const filtered = items.filter(i => {
-      const done = i.score != null;
+      const done = i.score != null; // true if attempted
       if (filterMode === "completed") return done;
       if (filterMode === "pending")   return !done;
       return true; // all
@@ -137,22 +145,22 @@
           </span>
         </li>
       `;
-    }).join('');
+    }).join("");
   }
 
   // ----- Initial fetch -----
   let lessons = await fetchLessonsWithAttempts();
   lessons = await filterItemsByStorage(
-    lessons, 
-    `${ctx.profile.display_name}/lessons`, 
-    `${ctx.profile.display_name}/quizzes`
+    lessons,
+    `${userFolder}/lessons`,
+    `${userFolder}/quizzes`
   );
 
   let tests = await fetchTestsWithAttempts();
   tests = await filterItemsByStorage(
-    tests, 
-    `${ctx.profile.display_name}/tests`, 
-    `${ctx.profile.display_name}/tests/questions`
+    tests,
+    `${userFolder}/tests`,
+    `${userFolder}/tests/questions`
   );
 
   function doRender() {
