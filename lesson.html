@@ -5,149 +5,98 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Math — Lesson</title>
   <link rel="stylesheet" href="assets/app.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
-  <script src="assets/lesson-inputs.js"></script>
 </head>
 <body>
 <header>
-  <h1 id="lesson-title">Loading Lesson…</h1>
-  <nav>
-    <a href="index.html" class="button secondary">⬅ Back to Lesson Page</a>
-  </nav>
+  <h1>Math — Lesson</h1>
   <div id="auth"></div>
 </header>
 
-<main class="card">
-  <div id="lesson-content" data-lesson-id="">Loading…</div>
-  <form id="quiz-form"></form>
-  <button id="submit" class="primary" style="display:none;">Submit Quiz</button>
-  <div id="results"></div>
+<main id="content" class="card">
+  <div id="markdown">Loading lesson…</div>
+  <form id="quiz"></form>
+  <button id="submit" class="primary">Submit Lesson</button>
+  <div id="result"></div>
 </main>
 
 <script>
 (async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const slug = urlParams.get('slug');
-
-  // get current user + profile
+  const authEl = document.getElementById("auth");
   const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
-    document.getElementById("lesson-content").textContent = "You must be signed in.";
+    authEl.innerHTML = "Please log in.";
+    return;
+  } else {
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? "User"}</span>
+                        <button id="logout">Sign out</button>`;
+    document.getElementById("logout").onclick = api.signOut;
+  }
+  const userId = ctx.user.id;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const slug = urlParams.get("slug");
+
+  // 1. Fetch lesson row
+  const { data: lesson, error } = await sb.supabase
+    .from("lessons")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error || !lesson) {
+    document.getElementById("content").innerHTML = "<p>Lesson not found.</p>";
     return;
   }
 
-  // fetch lesson by slug
-  const lesson = await api.getLessonBySlug(slug);
-  if (!lesson) {
-    document.getElementById("lesson-content").textContent = "Lesson not found.";
-    return;
-  }
+  // 2. Fetch markdown + quiz from storage
+  const md = await api.fetchSignedText(lesson.md_path);
+  const quiz = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
 
-  // fetch markdown + quiz JSON from storage
-  let lessonText, quizJson;
-  try {
-    lessonText = await api.fetchSignedText(lesson.md_path);
-    quizJson   = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
-  } catch (err) {
-    document.getElementById("lesson-content").textContent = "Error loading lesson files.";
-    console.error(err);
-    return;
-  }
+  // Render markdown
+  document.getElementById("markdown").innerHTML = marked.parse(md);
 
-  // render lesson
-  const lessonEl = document.getElementById("lesson-content");
-  document.getElementById("lesson-title").textContent = lesson.title;
-  lessonEl.dataset.lessonId = lesson.id || lesson.slug || "";
-  lessonEl.innerHTML = marked.parse(lessonText);
-
-  // attach autosave inputs
-  window.attachLessonInputs({ lessonId: lessonEl.dataset.lessonId, userId: ctx.user.id });
-
-  // render quiz
-  const quizForm = document.getElementById("quiz-form");
-  quizForm.innerHTML = quizJson.questions.map((q, idx) => {
-    let imageHtml = q.image ? `<div><img src="${q.image}" alt="Question image" style="max-width:200px; margin:8px 0;"></div>` : "";
-    if (q.type === "mcq") {
-      return `
-        <fieldset>
-          <legend>${idx+1}. ${q.prompt}</legend>
-          ${imageHtml}
-          ${q.choices.map((choice, i) => `
-            <label>
-              <input type="radio" name="${q.id}" value="${i}">
-              ${choice}
-            </label><br>
-          `).join('')}
-        </fieldset>
-      `;
-    } else if (q.type === "input") {
-      return `
-        <fieldset>
-          <legend>${idx+1}. ${q.prompt}</legend>
-          ${imageHtml}
-          <input type="text" name="${q.id}" placeholder="Type your answer">
-        </fieldset>
-      `;
+  // Render quiz
+  const quizEl = document.getElementById("quiz");
+  quiz.questions.forEach(q => {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.innerHTML = `<p>${q.prompt}</p>`;
+    if (q.type === "input") {
+      div.innerHTML += `<input type="text" data-id="${q.id}">`;
+    } else if (q.type === "mcq") {
+      q.choices.forEach((c, i) => {
+        div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${c}</label><br>`;
+      });
     }
-  }).join("");
+    quizEl.appendChild(div);
+  });
 
-  // show submit button once everything is ready
-  document.getElementById("submit").style.display = "inline-block";
-
-  // handle submission
+  // Handle submit
   document.getElementById("submit").onclick = async (e) => {
     e.preventDefault();
-    let score = 0;
-    const resultsDiv = document.getElementById("results");
-    resultsDiv.innerHTML = "";
-
-    quizJson.questions.forEach((q, idx) => {
-      let correct = false;
-      if (q.type === "mcq") {
-        const selected = document.querySelector(`input[name="${q.id}"]:checked`);
-        if (selected && parseInt(selected.value) === q.answerIndex) correct = true;
-      }  else if (q.type === "input") {
-        const el = document.querySelector(`input[name="${q.id}"]`);
-        const entered = el ? el.value.trim() : "";
-        if (entered && q.correctAnswer && entered.toLowerCase() === q.correctAnswer.toLowerCase()) {
-          correct = true;
-  }
-}
-
-
-
-      if (correct) score += 1;
-      resultsDiv.innerHTML += `<p>${idx+1}. ${q.prompt}<br>
-        ${correct ? "✅ Correct" : "❌ Incorrect"}<br>
-        <em>${q.explain}</em></p>`;
+    let correct = 0;
+    quiz.questions.forEach(q => {
+      if (q.type === "input") {
+        const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim();
+        if (val == q.answer) correct++;
+      } else if (q.type === "mcq") {
+        const checked = document.querySelector(`input[name="${q.id}"]:checked`);
+        if (checked && parseInt(checked.value) === q.answerIndex) correct++;
+      }
     });
+    const score = Math.round((correct / quiz.questions.length) * 100);
+    document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
 
-    const percent = Math.round((score / quizJson.questions.length) * 100);
-    resultsDiv.innerHTML = `<h3>You scored ${score} / ${quizJson.questions.length} (${percent}%)</h3>` + resultsDiv.innerHTML;
-
-    // record attempt
-    const { data: { user } } = await sb.supabase.auth.getUser();
-    const { error } = await api.recordAttempt(lesson.id, user.id, percent);
-    if (error) {
-      console.error("Failed to save attempt:", error.message);
-      alert("Could not save your score: " + error.message);
-      return;
-    }
-
-    // hide Submit button and show retake
-    document.getElementById("submit").style.display = "none";
-    resultsDiv.innerHTML += `
-      <div id="retake-box" style="margin-top:1em;">
-        <button id="retake-btn" class="secondary">Send retake message</button>
-      </div>
-    `;
-
-    document.getElementById("retake-btn").onclick = () => {
-      alert("Retake request sent! (parent dashboard will handle approval)");
-    };
+    // Save attempt tied to mapping_id (lesson.id)
+    await sb.supabase.from("attempts").insert({
+      user_id: userId,
+      mapping_id: lesson.id,
+      score
+    });
   };
 })();
 </script>
