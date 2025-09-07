@@ -87,12 +87,13 @@
     return names;
   }
 
-  async function filterItemsByStorage(items, folder) {
-    const names = await listFiles(folder);
+  async function filterItemsByStorage(items, mdFolder, quizFolder) {
+    const mdNames = await listFiles(mdFolder);
+    const quizNames = await listFiles(quizFolder);
     return items.filter(i => {
       const mdName = i.md_path?.split("/").pop();
       const qzName = i.quiz_path?.split("/").pop();
-      return names.has(mdName) && names.has(qzName);
+      return mdNames.has(mdName) && quizNames.has(qzName);
     });
   }
 
@@ -141,10 +142,18 @@
 
   // ----- Initial fetch -----
   let lessons = await fetchLessonsWithAttempts();
-  lessons = await filterItemsByStorage(lessons, `${ctx.profile.display_name}/lessons`);
+  lessons = await filterItemsByStorage(
+    lessons, 
+    `${ctx.profile.display_name}/lessons`, 
+    `${ctx.profile.display_name}/quizzes`
+  );
 
   let tests = await fetchTestsWithAttempts();
-  tests = await filterItemsByStorage(tests, `${ctx.profile.display_name}/tests`);
+  tests = await filterItemsByStorage(
+    tests, 
+    `${ctx.profile.display_name}/tests`, 
+    `${ctx.profile.display_name}/tests/questions`
+  );
 
   function doRender() {
     renderItems(lessons, lessonsEl, "lessons", filterEl.value);
