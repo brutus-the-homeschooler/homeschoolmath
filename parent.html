@@ -78,7 +78,7 @@
     const { data: lessons, error: lErr } = await sb.supabase
       .from("lesson_with_attempts")
       .select("*")
-      .eq("user_id", studentId);
+      .eq("user_id", ctx.user.id);
 
     if (lErr) {
       summaryEl.innerHTML = `<p class="muted">Error loading lessons: ${lErr.message}</p>`;
@@ -89,7 +89,7 @@
     const { data: tests, error: tErr } = await sb.supabase
       .from("tests_with_attempts")
       .select("*")
-      .eq("user_id", studentId);
+      .eq("user_id", ctx.user.id);
 
     if (tErr) {
       summaryEl.innerHTML = `<p class="muted">Error loading tests: ${tErr.message}</p>`;
