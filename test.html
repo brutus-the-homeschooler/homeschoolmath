@@ -17,6 +17,7 @@
 </header>
 
 <main id="content" class="card">
+  <h2 id="test-title"></h2>
   <div id="markdown">Loading test…</div>
   <form id="quiz"></form>
   <button id="submit" class="primary">Submit Test</button>
@@ -52,14 +53,14 @@
     return;
   }
 
+  document.getElementById("test-title").textContent = test.title;
+
   // 2. Fetch markdown + quiz
   const md = await api.fetchSignedText(test.md_path);
   const quiz = JSON.parse(await api.fetchSignedText(test.quiz_path));
 
-  // Render markdown
   document.getElementById("markdown").innerHTML = marked.parse(md);
 
-  // Render quiz
   const quizEl = document.getElementById("quiz");
   quiz.questions.forEach(q => {
     const div = document.createElement("div");
@@ -75,7 +76,7 @@
     quizEl.appendChild(div);
   });
 
-  // Handle submit
+  // 3. Handle submit
   document.getElementById("submit").onclick = async (e) => {
     e.preventDefault();
     let correct = 0;
@@ -91,12 +92,19 @@
     const score = Math.round((correct / quiz.questions.length) * 100);
     document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
 
-    // Save attempt tied to mapping_id (test.id)
-    await sb.supabase.from("attempts").insert({
-      user_id: userId,
-      mapping_id: test.id,
-      score
-    });
+    // 4. Upsert into attempts
+    const { error: saveErr } = await sb.supabase
+      .from("attempts")
+      .upsert({
+        user_id: userId,
+        mapping_id: test.id,
+        score
+      }, { onConflict: "user_id,mapping_id" });
+
+    if (saveErr) {
+      console.error(saveErr);
+      alert("Error saving attempt: " + saveErr.message);
+    }
   };
 })();
 </script>
