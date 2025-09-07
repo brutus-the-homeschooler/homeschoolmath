@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Parent Dashboard</title>
   <link rel="stylesheet" href="assets/app.css">
-  <!-- Supabase + your client helpers -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
@@ -16,193 +15,101 @@
   <div id="auth"></div>
 </header>
 
-<main id="content">
-  <!-- (Rendered only when signed in) -->
-</main>
+<main id="content" class="card">
+  <section id="controls" style="display:none;">
+    <label for="student">Select Student:</label>
+    <select id="student"></select>
 
-<!-- Parent controls JS (you said this is already created as step 3) -->
-<script type="module" src="assets/parent-controls.js"></script>
+    <div id="summary" style="margin-top:1rem;"></div>
+  </section>
+</main>
 
 <script>
 (async () => {
-  const authEl = document.getElementById('auth');
-  const content = document.getElementById('content');
+  const authEl = document.getElementById("auth");
+  const controls = document.getElementById("controls");
+  const studentSel = document.getElementById("student");
+  const summaryEl = document.getElementById("summary");
 
-  // Expecting sb.currentUserWithProfile() from your supabaseClient.js helper
-  const ctx = await sb.currentUserWithProfile?.();
+  // --- Auth ---
+  const ctx = await sb.currentUserWithProfile();
   if (!ctx) {
     authEl.innerHTML = `
-      <input id="email" type="text" placeholder="Email" autocapitalize="none" autocomplete="username">
-      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-      <button class="primary" id="login">Login</button>
+      <input id="email" type="text" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <button id="login">Login</button>
     `;
-
     const doLogin = async () => {
-      const btn = document.getElementById('login');
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
       if (!email || !password) { alert("Enter both email and password"); return; }
-      btn.disabled = true;
       const user = await api.signInWithPassword(email, password);
       if (user) location.reload();
-      btn.disabled = false;
     };
+    document.getElementById("login").onclick = doLogin;
+    return;
+  } else {
+    authEl.innerHTML = `<span>${ctx.profile?.display_name ?? "Parent"}</span>
+                        <button id="logout">Sign out</button>`;
+    document.getElementById("logout").onclick = api.signOut;
+    controls.style.display = "block";
+  }
 
-    document.getElementById('login').onclick = doLogin;
-    document.getElementById('password').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') doLogin();
-    });
+  // --- Load students ---
+  const { data: students, error: stuErr } = await sb.supabase
+    .from("profiles")
+    .select("id, display_name")
+    .eq("role", "student");
 
-    content.innerHTML = '<section class="card"><p>Sign in to view assignments.</p></section>';
+  if (stuErr) {
+    summaryEl.innerHTML = `<p class="muted">Error loading students: ${stuErr.message}</p>`;
     return;
   }
 
-  // ---------- Signed-in UI ----------
-  content.innerHTML = `
-    <section class="card">
-      <h2>Grant a Retake</h2>
-      <div>
-        <label>Student: <select id="student"></select></label>
-        <label>Week: <select id="week"></select></label>
-        <label>Lesson: <select id="lesson"></select></label>
-        <button id="grant" class="primary">Grant Retake</button>
-      </div>
-      <p class="muted">Granting a retake allows one additional submission for the selected lesson for that student.</p>
-    </section>
+  studentSel.innerHTML = students.map(s => 
+    `<option value="${s.id}">${s.display_name}</option>`).join("");
 
-    <section class="card">
-      <h2>Mark as Done / Overrides (Selected Student & Week)</h2>
-      <div id="controlsList"></div>
-      <p class="muted">These settings affect what the student sees as their effective completion, score, and attempts. Clear fields and uncheck to revert.</p>
-    </section>
+  // --- Load summary for selected student ---
+  async function loadSummary(studentId) {
+    // Lessons
+    const { data: lessons } = await sb.supabase
+      .from("lessons")
+      .select("id, title");
+    const { data: lAttempts } = await sb.supabase
+      .from("attempts")
+      .select("mapping_id, score")
+      .eq("user_id", studentId);
 
-    <section class="card">
-      <h2>Attempts (Selected Week)</h2>
-      <table class="table" id="attemptsTable">
-        <thead><tr><th>When</th><th>Student</th><th>Lesson</th><th>Score</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
-  `;
+    const lessonIds = new Set(lessons.map(l => l.id));
+    const completedLessons = lAttempts.filter(a => lessonIds.has(a.mapping_id)).length;
+    const totalLessons = lessons.length;
 
-  // Elements
-  const studentSel = document.getElementById('student');
-  const weekSel = document.getElementById('week');
-  const lessonSel = document.getElementById('lesson');
-  const controlsList = document.getElementById('controlsList');
+    // Tests
+    const { data: tests } = await sb.supabase
+      .from("tests")
+      .select("id, title");
+    const testIds = new Set(tests.map(t => t.id));
+    const completedTests = lAttempts.filter(a => testIds.has(a.mapping_id)).length;
+    const totalTests = tests.length;
 
-  // Populate students
-  const students = await api.listStudents();
-  studentSel.innerHTML = students.map(s => `<option value="${s.user_id}">${s.display_name}</option>`).join('');
-
-  // Populate weeks
-  const weeks = await api.listWeeks();
-  weekSel.innerHTML = weeks.map(w => `<option value="${w.id}">${w.label}</option>`).join('');
-
-  // Populate lessons for the selected week (for the Retake dropdown)
-  async function refreshLessonsSelect(){
-    const lessons = await api.listAllLessons(Number(weekSel.value));
-    lessonSel.innerHTML = lessons.map(l => `<option value="${l.id}">${l.title} (${l.for_user})</option>`).join('');
+    // Render summary
+    summaryEl.innerHTML = `
+      <h3>Summary</h3>
+      <p><strong>Lessons:</strong> ${completedLessons} / ${totalLessons} completed (${totalLessons - completedLessons} remaining)</p>
+      <p><strong>Tests:</strong> ${completedTests} / ${totalTests} completed (${totalTests - completedTests} remaining)</p>
+    `;
   }
 
-  // Render Parent Controls list (selected student + week)
-  async function renderParentControls() {
-    controlsList.innerHTML = '<div class="muted">Loading…</div>';
-
-    const weekId = Number(weekSel.value);
-    const studentId = studentSel.value;
-
-    // 1) Lessons for this week
-    const lessons = await api.listAllLessons(weekId);
-    const lessonIds = lessons.map(l => l.id);
-
-    if (lessonIds.length === 0) {
-      controlsList.innerHTML = '<div class="muted">No lessons for this week.</div>';
-      return;
-    }
-
-    // 2) Effective status for (student, lessons)
-    // Using your Supabase client; supabaseClient.js should expose sb.client
-    const { data: statuses, error } = await sb.client
-      .from('v_lesson_effective_status')
-      .select('lesson_id,effective_completed,effective_score,effective_attempts,override_updated_at')
-      .eq('student_id', studentId)
-      .in('lesson_id', lessonIds);
-
-    if (error) {
-      controlsList.innerHTML = `<div class="muted">Error loading status: ${error.message}</div>`;
-      return;
-    }
-
-    const map = new Map();
-    (statuses || []).forEach(r => map.set(String(r.lesson_id), r));
-
-    // 3) Build blocks the parent-controls.js will enhance
-    controlsList.innerHTML = lessons.map(l => {
-      const st = map.get(String(l.id)) || {};
-      // Data attributes: strings only; coerce undefined -> ''
-      const done = st.effective_completed ? 'true' : 'false';
-      const score = (st.effective_score ?? '') === null ? '' : (st.effective_score ?? '');
-      const attempts = (st.effective_attempts ?? '') === null ? '' : (st.effective_attempts ?? '');
-      const badge = st.override_updated_at ? 'Parent override' : (st.effective_completed ? 'Submission' : '—');
-
-      return `
-        <div class="parent-controls"
-             data-lesson-id="${l.id}"
-             data-student-id="${studentId}"
-             data-initial-done="${done}"
-             data-initial-score="${score}"
-             data-initial-attempts="${attempts}">
-          <div class="row">
-            <strong>${l.title}</strong>
-            <span class="muted" data-source-badge>${badge}</span>
-          </div>
-
-          <label>
-            <input type="checkbox" data-pc-done>
-            Mark as done
-          </label>
-
-          <div class="grid-2">
-            <label>
-              Score (optional)
-              <input type="number" min="0" max="100" inputmode="numeric" data-pc-score placeholder="e.g., 95">
-            </label>
-            <label>
-              Attempts (optional)
-              <input type="number" min="0" inputmode="numeric" data-pc-attempts placeholder="e.g., 1">
-            </label>
-          </div>
-
-          <label>
-            Note (optional)
-            <textarea data-pc-note placeholder="Visible to teachers/parents"></textarea>
-          </label>
-
-          <div class="btns">
-            <button type="button" data-pc-save>Save</button>
-            <button type="button" data-pc-revert>Revert</button>
-          </div>
-
-          <div class="muted">
-            Shows on the student side as the effective status/score unless you clear overrides.
-          </div>
-        </div>
-      `;
-    }).join('');
+  // Load first student by default
+  if (students.length > 0) {
+    await loadSummary(students[0].id);
   }
 
-  // Grant retake handler
-  document.getElementById('grant').onclick = async () => {
-    const kid = studentSel.value, lesson = Number(lessonSel.value);
-    try{
-      await api.grantRetake(kid, lesson);
-      alert('Retake granted.');
-    } catch(e){ alert(e.message); }
-    await loadAttempts();
+  // Change student
+  studentSel.onchange = async () => {
+    await loadSummary(studentSel.value);
   };
-
-  // Attempts table for the selected week (all students)
-  async function loadAttempts(){
-    const weekId = Number(weekSel.value);
-    const rows = await api.li
+})();
+</script>
+</body>
+</html>
