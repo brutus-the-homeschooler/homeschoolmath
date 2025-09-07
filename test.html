@@ -43,9 +43,9 @@
   const urlParams = new URLSearchParams(window.location.search);
   const slug = urlParams.get("slug");
 
-  // 1. Fetch test row
+  // 1. Fetch test row (from view with attempts, not raw table)
   const { data: test, error } = await sb.supabase
-    .from("tests")
+    .from("tests_with_attempts")
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
@@ -58,56 +58,61 @@
   document.getElementById("test-title").textContent = test.title;
 
   // 2. Fetch markdown + quiz
-  const md = await api.fetchSignedText(test.md_path);
-  const quiz = JSON.parse(await api.fetchSignedText(test.quiz_path));
+  try {
+    const md = await api.fetchSignedText(test.md_path);
+    const quiz = JSON.parse(await api.fetchSignedText(test.quiz_path));
 
-  document.getElementById("markdown").innerHTML = marked.parse(md);
+    document.getElementById("markdown").innerHTML = marked.parse(md);
 
-  const quizEl = document.getElementById("quiz");
-  quiz.questions.forEach(q => {
-    const div = document.createElement("div");
-    div.className = "question";
-    div.innerHTML = `<p>${q.prompt}</p>`;
-    if (q.type === "input") {
-      div.innerHTML += `<input type="text" data-id="${q.id}">`;
-    } else if (q.type === "mcq") {
-      q.choices.forEach((c, i) => {
-        div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${c}</label><br>`;
-      });
-    }
-    quizEl.appendChild(div);
-  });
-
-  // 3. Handle submit
-  document.getElementById("submit").onclick = async (e) => {
-    e.preventDefault();
-    let correct = 0;
+    const quizEl = document.getElementById("quiz");
     quiz.questions.forEach(q => {
+      const div = document.createElement("div");
+      div.className = "question";
+      div.innerHTML = `<p>${q.prompt}</p>`;
       if (q.type === "input") {
-        const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim();
-        if (val == q.answer) correct++;
+        div.innerHTML += `<input type="text" data-id="${q.id}">`;
       } else if (q.type === "mcq") {
-        const checked = document.querySelector(`input[name="${q.id}"]:checked`);
-        if (checked && parseInt(checked.value) === q.answerIndex) correct++;
+        q.choices.forEach((c, i) => {
+          div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${c}</label><br>`;
+        });
       }
+      quizEl.appendChild(div);
     });
-    const score = Math.round((correct / quiz.questions.length) * 100);
-    document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
 
-    // 4. Upsert into attempts
-    const { error: saveErr } = await sb.supabase
-      .from("attempts")
-      .upsert({
-        user_id: userId,
-        mapping_id: test.id,
-        score
-      }, { onConflict: "user_id,mapping_id" });
+    // 3. Handle submit
+    document.getElementById("submit").onclick = async (e) => {
+      e.preventDefault();
+      let correct = 0;
+      quiz.questions.forEach(q => {
+        if (q.type === "input") {
+          const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim();
+          if (val == q.answer) correct++;
+        } else if (q.type === "mcq") {
+          const checked = document.querySelector(`input[name="${q.id}"]:checked`);
+          if (checked && parseInt(checked.value) === q.answerIndex) correct++;
+        }
+      });
+      const score = Math.round((correct / quiz.questions.length) * 100);
+      document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
 
-    if (saveErr) {
-      console.error(saveErr);
-      alert("Error saving attempt: " + saveErr.message);
-    }
-  };
+      // 4. Upsert into attempts
+      const { error: saveErr } = await sb.supabase
+        .from("attempts")
+        .upsert({
+          user_id: userId,
+          mapping_id: test.id, // same id from mapping/tests table
+          score
+        }, { onConflict: "user_id,mapping_id" });
+
+      if (saveErr) {
+        console.error(saveErr);
+        alert("Error saving attempt: " + saveErr.message);
+      }
+    };
+  } catch (err) {
+    console.error("Error loading test files:", err);
+    document.getElementById("markdown").innerHTML = "<p>Error loading test content.</p>";
+  }
 })();
 </script>
 </body>
