@@ -21,7 +21,6 @@
     <select id="student"></select>
 
     <div id="summary" style="margin-top:1rem;"></div>
-
     <div id="details" style="margin-top:2rem;"></div>
   </section>
 </main>
@@ -74,47 +73,25 @@
 
   // --- Load summary + details for selected student ---
   async function loadSummary(studentId) {
-    // Lessons with attempts
-    const { data: lessons, error: lErr } = await sb.supabase
-      .from("lesson_with_attempts")
-      .select("*")
-      .eq("user_id", ctx.user.id);
+    const { data: lessons } = await sb.supabase.from("lesson_with_attempts").select("*").eq("user_id", studentId);
+    const { data: tests }   = await sb.supabase.from("tests_with_attempts").select("*").eq("user_id", studentId);
 
-    if (lErr) {
-      summaryEl.innerHTML = `<p class="muted">Error loading lessons: ${lErr.message}</p>`;
-      return;
-    }
+    const completedLessons = (lessons || []).filter(l => l.score != null);
+    const remainingLessons = (lessons || []).filter(l => l.score == null);
 
-    // Tests with attempts
-    const { data: tests, error: tErr } = await sb.supabase
-      .from("tests_with_attempts")
-      .select("*")
-      .eq("user_id", ctx.user.id);
+    const completedTests = (tests || []).filter(t => t.score != null);
+    const remainingTests = (tests || []).filter(t => t.score == null);
 
-    if (tErr) {
-      summaryEl.innerHTML = `<p class="muted">Error loading tests: ${tErr.message}</p>`;
-      return;
-    }
-
-    // Split completed vs remaining
-    const completedLessons = lessons.filter(l => l.score !== null);
-    const remainingLessons = lessons.filter(l => l.score === null);
-
-    const completedTests = tests.filter(t => t.score !== null);
-    const remainingTests = tests.filter(t => t.score === null);
-
-    // Render summary
     summaryEl.innerHTML = `
       <h3>Summary</h3>
       <p><strong>Lessons:</strong> ${completedLessons.length} / ${lessons.length} completed (${remainingLessons.length} remaining)</p>
       <p><strong>Tests:</strong> ${completedTests.length} / ${tests.length} completed (${remainingTests.length} remaining)</p>
     `;
 
-    // Render details
     detailsEl.innerHTML = `
       <h3>Remaining Lessons</h3>
       ${remainingLessons.length > 0 
-        ? `<ul>${remainingLessons.map(l => `<li>${l.title}</li>`).join("")}</ul>`
+        ? `<ul>${remainingLessons.map(l => `<li>${l.title} — <span class="muted">Incomplete</span></li>`).join("")}</ul>`
         : `<p class="muted">All lessons completed ✅</p>`}
 
       <h3>Completed Lessons</h3>
@@ -124,7 +101,7 @@
 
       <h3>Remaining Tests</h3>
       ${remainingTests.length > 0 
-        ? `<ul>${remainingTests.map(t => `<li>${t.title}</li>`).join("")}</ul>`
+        ? `<ul>${remainingTests.map(t => `<li>${t.title} — <span class="muted">Incomplete</span></li>`).join("")}</ul>`
         : `<p class="muted">All tests completed ✅</p>`}
 
       <h3>Completed Tests</h3>
@@ -134,12 +111,10 @@
     `;
   }
 
-  // Load first student by default
   if (students.length > 0) {
     await loadSummary(students[0].user_id);
   }
 
-  // Change student
   studentSel.onchange = async () => {
     await loadSummary(studentSel.value);
   };
