@@ -75,7 +75,7 @@ async function getTestBySlug(slug) {
   }
   return data;
 }
-/*
+
 async function listTestsAssignedToCurrentUser() {
   const ctx = await sb.currentUserWithProfile();
   if (!ctx?.profile) return [];
@@ -84,7 +84,7 @@ async function listTestsAssignedToCurrentUser() {
   const { data, error } = await q.order("id", { ascending: true });
   if (error) throw error;
   return (data || []).filter(t => (t.for_user || "").trim().toLowerCase() === userName);
-}*/
+}
 
 async function listTestsWithAttempts(userName) {
   const { data, error } = await sb.supabase
@@ -104,7 +104,7 @@ async function listTestsWithAttempts(userName) {
 }
 
 
-
+/*
 // From the view with attempts
 async function listTestsWithAttempts(userName) {
   const { data, error } = await sb.supabase
@@ -112,7 +112,7 @@ async function listTestsWithAttempts(userName) {
     .select("*");
   if (error) throw error;
   return (data || []).filter(t => (t.for_user || "").trim().toLowerCase() === userName);
-}
+}*/
 
 // ---------- Attempts ----------
 async function upsertAttempt(mappingId, userId, score) {
