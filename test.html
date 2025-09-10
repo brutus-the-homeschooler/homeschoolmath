@@ -43,7 +43,7 @@
   const urlParams = new URLSearchParams(window.location.search);
   const slug = urlParams.get("slug");
 
-  // 1. Fetch test row (from view with attempts, not raw table)
+  // 1. Fetch test row
   const { data: test, error } = await sb.supabase
     .from("tests_with_attempts")
     .select("*")
@@ -69,6 +69,18 @@
       const div = document.createElement("div");
       div.className = "question";
       div.innerHTML = `<p>${q.prompt}</p>`;
+
+      // 👇 NEW: handle single or multiple images
+      if (q.images) {
+        if (Array.isArray(q.images)) {
+          q.images.forEach(imgPath => {
+            div.innerHTML += `<img src="${imgPath}" alt="Question image" style="max-width:100%;margin:0.5rem 0;">`;
+          });
+        } else {
+          div.innerHTML += `<img src="${q.images}" alt="Question image" style="max-width:100%;margin:0.5rem 0;">`;
+        }
+      }
+
       if (q.type === "input") {
         div.innerHTML += `<input type="text" data-id="${q.id}">`;
       } else if (q.type === "mcq") {
@@ -76,6 +88,7 @@
           div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${c}</label><br>`;
         });
       }
+
       quizEl.appendChild(div);
     });
 
@@ -100,7 +113,7 @@
         .from("attempts")
         .upsert({
           user_id: userId,
-          mapping_id: test.id, // same id from mapping/tests table
+          mapping_id: test.id,
           score
         }, { onConflict: "user_id,mapping_id" });
 
