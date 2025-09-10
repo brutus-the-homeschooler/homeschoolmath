@@ -70,6 +70,7 @@
 
   const BUCKET = "content";
   const userFolder = ctx.profile.display_name;
+  const userName = (ctx.profile.display_name || "").trim().toLowerCase();
 
   // ----- Helpers -----
   async function listFiles(folder) {
@@ -98,34 +99,21 @@
       const hasMd = mdNames.has(mdName);
       const hasQuiz = quizNames.has(qzName);
 
-      console.log("Checking item:", {
-        slug: i.slug,
-        mdName,
-        qzName,
-        hasMd,
-        hasQuiz
-      });
-
       return { ...i, hasMd, hasQuiz };
     });
   }
 
+  // ----- Fetch -----
   async function fetchLessonsWithAttempts() {
-    const { data, error } = await sb.supabase.from("lesson_with_attempts").select("*");
-    if (error) {
-      console.error("Error fetching lessons:", error.message);
-      return [];
-    }
-    return (data || []).filter(l => l.for_user === ctx.profile.display_name);
+    const lessons = await api.listLessonsWithAttempts(userName);
+    console.log("Lessons fetched:", lessons);
+    return lessons;
   }
 
   async function fetchTestsWithAttempts() {
-    const { data, error } = await sb.supabase.from("tests_with_attempts").select("*");
-    if (error) {
-      console.error("Error fetching tests:", error.message);
-      return [];
-    }
-    return (data || []).filter(t => t.for_user === ctx.profile.display_name);
+    const tests = await api.listTestsWithAttempts(userName);
+    console.log("Tests fetched:", tests);
+    return tests;
   }
 
   // ----- Rendering -----
