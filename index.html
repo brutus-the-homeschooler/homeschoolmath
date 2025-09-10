@@ -87,13 +87,26 @@
     return names;
   }
 
-  async function filterItemsByStorage(items, mdFolder, quizFolder) {
+  async function markItemsByStorage(items, mdFolder, quizFolder) {
     const mdNames = await listFiles(mdFolder);
     const quizNames = await listFiles(quizFolder);
-    return items.filter(i => {
+
+    return items.map(i => {
       const mdName = i.md_path?.split("/").pop();
       const qzName = i.quiz_path?.split("/").pop();
-      return mdNames.has(mdName) && quizNames.has(qzName);
+
+      const hasMd = mdNames.has(mdName);
+      const hasQuiz = quizNames.has(qzName);
+
+      console.log("Checking item:", {
+        slug: i.slug,
+        mdName,
+        qzName,
+        hasMd,
+        hasQuiz
+      });
+
+      return { ...i, hasMd, hasQuiz };
     });
   }
 
@@ -131,11 +144,20 @@
 
     containerEl.innerHTML = filtered.map(i => {
       const done = i.score != null;
+      const broken = !i.hasMd || !i.hasQuiz;
+      let brokenTitle = "";
+      if (broken) {
+        if (!i.hasMd && !i.hasQuiz) brokenTitle = "Missing: Markdown and JSON";
+        else if (!i.hasMd) brokenTitle = "Missing: Markdown (.md)";
+        else if (!i.hasQuiz) brokenTitle = "Missing: JSON (.json)";
+      }
+
       return `
         <li style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.25rem 0;">
           <span>
             <a href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">${i.title}</a>
             <small class="muted"> — for ${i.for_user ?? ""}</small>
+            ${broken ? `<span style="color:orange;cursor:help;" title="${brokenTitle}">⚠️</span>` : ""}
           </span>
           <span style="display:flex;align-items:center;gap:.5rem;">
             ${done 
@@ -150,14 +172,14 @@
 
   // ----- Initial fetch -----
   let lessons = await fetchLessonsWithAttempts();
-  lessons = await filterItemsByStorage(
+  lessons = await markItemsByStorage(
     lessons,
     `${userFolder}/lessons`,
     `${userFolder}/quizzes`
   );
 
   let tests = await fetchTestsWithAttempts();
-  tests = await filterItemsByStorage(
+  tests = await markItemsByStorage(
     tests,
     `${userFolder}/tests`,
     `${userFolder}/tests/questions`
