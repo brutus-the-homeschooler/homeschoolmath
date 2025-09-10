@@ -75,7 +75,7 @@ async function getTestBySlug(slug) {
   }
   return data;
 }
-
+/*
 async function listTestsAssignedToCurrentUser() {
   const ctx = await sb.currentUserWithProfile();
   if (!ctx?.profile) return [];
@@ -84,7 +84,26 @@ async function listTestsAssignedToCurrentUser() {
   const { data, error } = await q.order("id", { ascending: true });
   if (error) throw error;
   return (data || []).filter(t => (t.for_user || "").trim().toLowerCase() === userName);
+}*/
+
+async function listTestsWithAttempts(userName) {
+  const { data, error } = await sb.supabase
+    .from("tests_with_attempts")
+    .select("*");
+  if (error) throw error;
+
+  console.log("All tests_with_attempts rows:", data.map(t => ({
+    slug: t.slug,
+    for_user: t.for_user
+  })));
+  console.log("Comparing against userName =", userName);
+
+  return (data || []).filter(t =>
+    (t.for_user || "").trim().toLowerCase() === userName
+  );
 }
+
+
 
 // From the view with attempts
 async function listTestsWithAttempts(userName) {
