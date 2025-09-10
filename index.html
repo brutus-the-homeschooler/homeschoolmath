@@ -165,6 +165,7 @@
     `${userFolder}/lessons`,
     `${userFolder}/quizzes`
   );
+  lessons.sort((a, b) => a.id - b.id); // sort by id
 
   let tests = await fetchTestsWithAttempts();
   tests = await markItemsByStorage(
@@ -172,6 +173,7 @@
     `${userFolder}/tests`,
     `${userFolder}/tests/questions`
   );
+  tests.sort((a, b) => a.id - b.id); // sort by id
 
   function doRender() {
     renderItems(lessons, lessonsEl, "lessons", filterEl.value);
