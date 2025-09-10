@@ -50,21 +50,20 @@ async function getLessonBySlug(slug) {
 async function listLessonsAssignedToCurrentUser() {
   const ctx = await sb.currentUserWithProfile();
   if (!ctx?.profile) return [];
+  const userName = (ctx.profile.display_name || "").trim().toLowerCase();
   let q = sb.supabase.from("lessons").select("*");
-  if (ctx.profile.role === "student") q = q.eq("for_user", ctx.profile.display_name);
   const { data, error } = await q.order("id", { ascending: true });
   if (error) throw error;
-  return data || [];
+  return (data || []).filter(l => (l.for_user || "").trim().toLowerCase() === userName);
 }
 
 // From the view with attempts
-async function listLessonsWithAttempts(userId) {
+async function listLessonsWithAttempts(userName) {
   const { data, error } = await sb.supabase
     .from("lesson_with_attempts")
-    .select("*")
-    .eq("user_id", userId);
+    .select("*");
   if (error) throw error;
-  return data || [];
+  return (data || []).filter(l => (l.for_user || "").trim().toLowerCase() === userName);
 }
 
 // ---------- Tests ----------
@@ -80,21 +79,20 @@ async function getTestBySlug(slug) {
 async function listTestsAssignedToCurrentUser() {
   const ctx = await sb.currentUserWithProfile();
   if (!ctx?.profile) return [];
+  const userName = (ctx.profile.display_name || "").trim().toLowerCase();
   let q = sb.supabase.from("tests").select("*");
-  if (ctx.profile.role === "student") q = q.eq("for_user", ctx.profile.display_name);
   const { data, error } = await q.order("id", { ascending: true });
   if (error) throw error;
-  return data || [];
+  return (data || []).filter(t => (t.for_user || "").trim().toLowerCase() === userName);
 }
 
 // From the view with attempts
-async function listTestsWithAttempts(userId) {
+async function listTestsWithAttempts(userName) {
   const { data, error } = await sb.supabase
     .from("tests_with_attempts")
-    .select("*")
-    .eq("user_id", userId);
+    .select("*");
   if (error) throw error;
-  return data || [];
+  return (data || []).filter(t => (t.for_user || "").trim().toLowerCase() === userName);
 }
 
 // ---------- Attempts ----------
