@@ -52,7 +52,7 @@
   const urlParams = new URLSearchParams(window.location.search);
   const slug = urlParams.get("slug");
 
-  // 1. Fetch lesson row (from view with attempts, not raw table)
+  // 1. Fetch lesson row
   const { data: lesson, error } = await sb.supabase
     .from("lesson_with_attempts")
     .select("*")
@@ -71,28 +71,34 @@
     const md = await api.fetchSignedText(lesson.md_path);
     const quiz = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
 
-    // Render markdown
+    // Render markdown body
     document.getElementById("markdown").innerHTML = marked.parse(md);
-
-    // Re-typeset math after rendering
     if (window.MathJax) {
       MathJax.typesetPromise();
     }
 
+    // Render quiz
     const quizEl = document.getElementById("quiz");
     quiz.questions.forEach(q => {
       const div = document.createElement("div");
       div.className = "question";
-      div.innerHTML = `<p>${q.prompt}</p>`;
+      // Prompt goes through marked so it can use LaTeX + Markdown
+      div.innerHTML = `<p>${marked.parseInline(q.prompt)}</p>`;
       if (q.type === "input") {
         div.innerHTML += `<input type="text" data-id="${q.id}">`;
       } else if (q.type === "mcq") {
         q.choices.forEach((c, i) => {
-          div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${c}</label><br>`;
+          // Choices go through marked too
+          div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${marked.parseInline(c)}</label><br>`;
         });
       }
       quizEl.appendChild(div);
     });
+
+    // Re-typeset math in quiz prompts and choices
+    if (window.MathJax) {
+      MathJax.typesetPromise();
+    }
 
     // 3. Handle submit
     document.getElementById("submit").onclick = async (e) => {
@@ -101,7 +107,8 @@
       quiz.questions.forEach(q => {
         if (q.type === "input") {
           const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim();
-          if (val == q.answer) correct++;
+          // Support both q.answer and q.correctAnswer for flexibility
+          if (val == q.answer || val == q.correctAnswer) correct++;
         } else if (q.type === "mcq") {
           const checked = document.querySelector(`input[name="${q.id}"]:checked`);
           if (checked && parseInt(checked.value) === q.answerIndex) correct++;
@@ -110,12 +117,12 @@
       const score = Math.round((correct / quiz.questions.length) * 100);
       document.getElementById("result").innerHTML = `<p>Score: ${score}%</p>`;
 
-      // 4. Upsert into attempts
+      // 4. Save attempt
       const { error: saveErr } = await sb.supabase
         .from("attempts")
         .upsert({
           user_id: userId,
-          mapping_id: lesson.id, // id from mapping/lessons table
+          mapping_id: lesson.id,
           score
         }, { onConflict: "user_id,mapping_id" });
 
