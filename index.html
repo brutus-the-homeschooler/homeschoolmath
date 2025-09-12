@@ -8,6 +8,30 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
+  <style>
+    .progress-container {
+      margin: .5rem 0;
+    }
+    .progress-label {
+      font-size: .9rem;
+      margin-bottom: .25rem;
+      display: block;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #eee;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #2e7d32);
+      width: 0;
+      transition: width .5s ease;
+    }
+  </style>
 </head>
 <body>
 <header style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
@@ -29,6 +53,16 @@
   <h2>Progress</h2>
   <div id="progress-summary" class="muted">Loading progress…</div>
 
+  <div class="progress-container">
+    <span class="progress-label">Lessons</span>
+    <div class="progress-bar"><div id="lesson-progress" class="progress-fill"></div></div>
+  </div>
+
+  <div class="progress-container">
+    <span class="progress-label">Tests</span>
+    <div class="progress-bar"><div id="test-progress" class="progress-fill"></div></div>
+  </div>
+
   <h2>Lessons</h2>
   <ul id="lessons">Loading…</ul>
 
@@ -45,6 +79,8 @@
   const testsEl   = document.getElementById("tests");
   const filterEl  = document.getElementById("lesson-filter");
   const progressEl = document.getElementById("progress-summary");
+  const lessonProgressEl = document.getElementById("lesson-progress");
+  const testProgressEl   = document.getElementById("test-progress");
 
   // ----- Auth -----
   const ctx = await sb.currentUserWithProfile();
@@ -177,6 +213,13 @@
       Lessons: ${doneLessons}/${totalLessons} completed |
       Tests: ${doneTests}/${totalTests} completed
     `;
+
+    // ✅ Update progress bars
+    const lessonPct = totalLessons > 0 ? Math.round((doneLessons / totalLessons) * 100) : 0;
+    const testPct   = totalTests > 0 ? Math.round((doneTests / totalTests) * 100) : 0;
+
+    lessonProgressEl.style.width = lessonPct + "%";
+    testProgressEl.style.width   = testPct + "%";
   }
 
   // ----- Initial fetch -----
