@@ -6,6 +6,7 @@
   <title>Math — Lesson</title>
   <link rel="stylesheet" href="assets/app.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
@@ -13,10 +14,10 @@
   <!-- MathJax config + loader -->
   <script>
     window.MathJax = {
-       tex: {
-    inlineMath: [['$', '$'], ['\\(', '\\)']],
-    displayMath: [['\\[', '\\]']],   
-  },
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['\\[', '\\]'], ['$$', '$$']], // 👈 added block math support
+      },
       svg: { fontCache: 'global' }
     };
   </script>
@@ -74,31 +75,27 @@
     const md = await api.fetchSignedText(lesson.md_path);
     const quiz = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
 
-    // Render markdown body
-    document.getElementById("markdown").innerHTML = marked.parse(md);
-    if (window.MathJax) {
-      MathJax.typesetPromise();
-    }
+    // Render markdown body safely
+    const safeHtml = DOMPurify.sanitize(marked.parse(md));
+    document.getElementById("markdown").innerHTML = safeHtml;
 
     // Render quiz
     const quizEl = document.getElementById("quiz");
     quiz.questions.forEach(q => {
       const div = document.createElement("div");
       div.className = "question";
-      // Prompt goes through marked so it can use LaTeX + Markdown
-      div.innerHTML = `<p>${marked.parseInline(q.prompt)}</p>`;
+      div.innerHTML = `<p>${DOMPurify.sanitize(marked.parseInline(q.prompt))}</p>`;
       if (q.type === "input") {
         div.innerHTML += `<input type="text" data-id="${q.id}">`;
       } else if (q.type === "mcq") {
         q.choices.forEach((c, i) => {
-          // Choices go through marked too
-          div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${marked.parseInline(c)}</label><br>`;
+          div.innerHTML += `<label><input type="radio" name="${q.id}" value="${i}"> ${DOMPurify.sanitize(marked.parseInline(c))}</label><br>`;
         });
       }
       quizEl.appendChild(div);
     });
 
-    // Re-typeset math in quiz prompts and choices
+    // Run MathJax once for body + quiz
     if (window.MathJax) {
       MathJax.typesetPromise();
     }
@@ -109,9 +106,8 @@
       let correct = 0;
       quiz.questions.forEach(q => {
         if (q.type === "input") {
-          const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim();
-          // Support both q.answer and q.correctAnswer for flexibility
-          if (val == q.answer || val == q.correctAnswer) correct++;
+          const val = document.querySelector(`input[data-id="${q.id}"]`).value.trim().toLowerCase();
+          if (val == String(q.answer).toLowerCase() || val == String(q.correctAnswer).toLowerCase()) correct++;
         } else if (q.type === "mcq") {
           const checked = document.querySelector(`input[name="${q.id}"]:checked`);
           if (checked && parseInt(checked.value) === q.answerIndex) correct++;
