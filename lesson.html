@@ -9,6 +9,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/api.js"></script>
+
+  <!-- MathJax config + loader -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 <header>
@@ -62,7 +71,13 @@
     const md = await api.fetchSignedText(lesson.md_path);
     const quiz = JSON.parse(await api.fetchSignedText(lesson.quiz_path));
 
+    // Render markdown
     document.getElementById("markdown").innerHTML = marked.parse(md);
+
+    // Re-typeset math after rendering
+    if (window.MathJax) {
+      MathJax.typesetPromise();
+    }
 
     const quizEl = document.getElementById("quiz");
     quiz.questions.forEach(q => {
