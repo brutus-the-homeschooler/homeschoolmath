@@ -26,6 +26,9 @@
 </header>
 
 <main id="content" class="card">
+  <h2>Progress</h2>
+  <div id="progress-summary" class="muted">Loading progress…</div>
+
   <h2>Lessons</h2>
   <ul id="lessons">Loading…</ul>
 
@@ -41,6 +44,7 @@
   const lessonsEl = document.getElementById("lessons");
   const testsEl   = document.getElementById("tests");
   const filterEl  = document.getElementById("lesson-filter");
+  const progressEl = document.getElementById("progress-summary");
 
   // ----- Auth -----
   const ctx = await sb.currentUserWithProfile();
@@ -80,7 +84,10 @@
       const { data, error } = await sb.supabase
         .storage.from(BUCKET)
         .list(folder, { limit: pageSize, offset: page * pageSize });
-      if (error) break;
+      if (error) {
+        console.error("Storage list error:", error);
+        break;
+      }
       (data || []).forEach(f => names.add(f.name));
       if (!data || data.length < pageSize) break;
       page++;
@@ -151,11 +158,25 @@
             ${done 
               ? `<span title="Completed">✅</span><span class="badge">${i.score}%</span>` 
               : `<span class="muted">Incomplete</span>`}
-            <a class="button" href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">Open</a>
+            ${broken 
+              ? `<span class="muted">Unavailable</span>` 
+              : `<a class="button" href="${type.slice(0,-1)}.html?slug=${encodeURIComponent(i.slug)}">Open</a>`}
           </span>
         </li>
       `;
     }).join("");
+  }
+
+  function renderProgressSummary(lessons, tests) {
+    const doneLessons = lessons.filter(l => l.score != null).length;
+    const totalLessons = lessons.length;
+    const doneTests = tests.filter(t => t.score != null).length;
+    const totalTests = tests.length;
+
+    progressEl.innerHTML = `
+      Lessons: ${doneLessons}/${totalLessons} completed |
+      Tests: ${doneTests}/${totalTests} completed
+    `;
   }
 
   // ----- Initial fetch -----
@@ -176,6 +197,7 @@
   tests.sort((a, b) => a.id - b.id); // sort by id
 
   function doRender() {
+    renderProgressSummary(lessons, tests);
     renderItems(lessons, lessonsEl, "lessons", filterEl.value);
     renderItems(tests, testsEl, "tests", filterEl.value);
   }
